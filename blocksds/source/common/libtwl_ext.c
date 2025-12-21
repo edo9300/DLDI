@@ -5,6 +5,7 @@
 */
 
 #include <libtwl/card/card.h>
+#include <common/libtwl_ext.h>
 #include <nds/ndstypes.h>
 
 void cardExt_ReadData(u64 command, u32 flags, void* buffer, u32 length) {
@@ -36,4 +37,11 @@ void cardExt_SendCommand(u64 command, u32 flags) {
     card_romSetCmd(command);
     card_romStartXfer(flags | MCCNT1_LEN_0, false);
     card_romWaitBusy();
+}
+
+u8 cardExt_ReadWriteSpiByte(u8 data)
+{
+    REG_MCD0 = data;
+    cardExt_WaitSpiBusy();
+    return REG_MCD0;
 }
