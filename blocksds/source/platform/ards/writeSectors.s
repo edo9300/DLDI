@@ -64,7 +64,7 @@ write_next_byte:
 
 	@ Wait for card to write data
 	bl      WaitSpiByteTimeout
-	bcc     sector_write_timeout_expired
+	beq     sector_write_timeout_expired
 
 	cmp     r6, r5
 	bne     write_next_sector
