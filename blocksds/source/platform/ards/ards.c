@@ -13,34 +13,82 @@
 #include <common/libtwl_ext.h>
 #include "ards.h"
 
+void waitByLoop(int);
+
 static bool isSdhc = false;
 
-static void ARDS_SendNtrCommandF2(u32 param1, u8 param2) {
+static void ARDS_SendNtrCommandF22(u32 param1, u8 param2) {
     cardExt_SendCommand(ARDS_CMD_F2(param1, param2), ARDS_CTRL_BASE);
 }
 
+void ARDS_SendNtrCommandF2(u8 param2);
+void cardExt_EnableSpi2();
+u8 ARDS_ReadSpiByte(void);
+u8 cardExt_ReadWriteSpiByte2(u8);
+u8 ARDS_ReadSpiByteTimeout(void);
+void ARDS_CycleSpi();
+u8 ARDS_SpiSendSDIOCommand2(u32 arg, u8 cmdId, int extraBytes);
+u8 ARDS_SpiSendSDIOCommandR02(u32 arg, u8 cmd);
+
+/*
 static u8 ARDS_ReadSpiByte(void) {
     return cardExt_ReadWriteSpiByte(ARDS_SPI_READ_BYTE);
 }
-
-static void ARDS_InitializeSpi(u8 cmd) {
-    ARDS_SendNtrCommandF2(0, cmd);
-    cardExt_EnableSpi();
-    if(cmd == ARDS_CMD_F2_SPI_DISABLE)
-        ARDS_ReadSpiByte();
-}
-
+*/
 // Waits for timeout, then returns resulting data.
-static u8 ARDS_ReadSpiByteTimeout(void) {
+/*
+u8 ARDS_ReadSpiByteTimeout(void) {
     int timeout = ARDS_SD_CMD_TIMEOUT_LEN;
     u8 data;
     while (data = ARDS_ReadSpiByte(), data == 0xFF && --timeout > 0);
     return data;
-}
+}*/
+/*
+static void ARDS_CycleSpi() {
+    ARDS_SendNtrCommandF2(ARDS_CMD_F2_SPI_DISABLE);
+    cardExt_EnableSpi2();
+	ARDS_ReadSpiByte();
+    ARDS_SendNtrCommandF2(ARDS_CMD_F2_SPI_ENABLE);
+    cardExt_EnableSpi2();
+}*/
+
+
+// Sends SDIO command to ARDS.
+/*
+u8 ARDS_SpiSendSDIOCommand2(u32 arg, u8 cmdId, int extraBytes)
+{
+	ARDS_CycleSpi();
+    uint8_t cmd[6];
+
+    // Build a SPI SD command to be sent as-is.
+    cmd[0] = cmdId;
+    cmd[1] = arg >> 24;
+    cmd[2] = arg >> 16;
+    cmd[3] = arg >> 8;
+    cmd[4] = arg >> 0;
+
+    for (int i = 0; i < sizeof(cmd); i++) cardExt_ReadWriteSpiByte2(cmd[i]);
+
+    u8 timeout = ARDS_ReadSpiByteTimeout();
+
+    for(int i=0; i < extraBytes; i++)
+    {
+        (void)ARDS_ReadSpiByte();
+    }
+
+    return timeout;
+}*/
+/*
+u8 ARDS_SpiSendSDIOCommandR02(u32 arg, u8 cmd)
+{
+    return ARDS_SpiSendSDIOCommand2(arg, cmd, 0);
+}*/
+
 
 // Sends SDIO command to ARDS.
 static u8 ARDS_SpiSendSDIOCommand(u8 cmdId, u32 arg, u8 * buffer, int len)
 {
+	ARDS_CycleSpi();
     uint8_t cmd[6];
 
     // Build a SPI SD command to be sent as-is.
@@ -79,10 +127,8 @@ bool ARDS_SDInitialize(void)
 {
     bool isv2 = false;
     for (int i = 0; i < 0x100; i++) {
-        ARDS_SendNtrCommandF2(0x7FFFFFFF | ((i & 1) << 31), 0x00);
+        ARDS_SendNtrCommandF22(0x7FFFFFFF | ((i & 1) << 31), 0x00);
     }
-
-    ARDS_InitializeSpi(ARDS_CMD_F2_SPI_ENABLE);
 
     // Send CMD0.
     uint8_t r1 = ARDS_SpiSendSDIOCommandR0(0, 0);
@@ -127,7 +173,7 @@ bool ARDS_SDInitialize(void)
 bool ARDS_SDReadSingleSector(u32 sector, u8 * buffer) {
     sector = isSdhc ? sector : sector << 9;
 
-    if(ARDS_SpiSendSDIOCommandR0(ARDS_SDIO_CMD17_READ_SINGLE_BLOCK, sector) != 0)
+    if(ARDS_SpiSendSDIOCommandR02(sector, ARDS_SDIO_CMD17_READ_SINGLE_BLOCK | 0x40) != 0)
         return false;
 
     // Wait for data start token
@@ -142,11 +188,11 @@ bool ARDS_SDReadSingleSector(u32 sector, u8 * buffer) {
 
     return true;
 }
-
-bool ARDS_SDReadMultipleSector(u32 sector, u32 num_sectors, u8 * buffer) {
+// bool ARDS_SDReadMultipleSector(u32 sector, u32 num_sectors, u8 * buffer);
+bool ARDS_SDReadMultipleSector2(u32 sector, u32 num_sectors, u8 * buffer) {
     sector = isSdhc ? sector : sector << 9;
 
-    if(ARDS_SpiSendSDIOCommandR0(ARDS_SDIO_CMD18_READ_MULTIPLE_BLOCK, sector) != 0)
+    if(ARDS_SpiSendSDIOCommandR02(sector, ARDS_SDIO_CMD18_READ_MULTIPLE_BLOCK | 0x40) != 0)
         return false;
 
     for(int i=0; i < num_sectors; i++)
@@ -164,7 +210,7 @@ bool ARDS_SDReadMultipleSector(u32 sector, u32 num_sectors, u8 * buffer) {
 
     // this message returns 1 byte of response, but it needs up to 8 bytes
     // to be polled before we get the busy bytes
-    ARDS_SpiSendSDIOCommand(ARDS_SDIO_CMD12_STOP_TRANSMISSION, 0, NULL, 7);
+    ARDS_SpiSendSDIOCommand2(0, ARDS_SDIO_CMD12_STOP_TRANSMISSION | 0x40, 7);
 
     // Wait for card to finish
     int timeout = ARDS_SD_CMD_TIMEOUT_LEN;
@@ -178,7 +224,7 @@ bool ARDS_SDWriteSingleSector(u32 sector, const u8 * buffer)
     sector = isSdhc ? sector : sector << 9;
 
     // this message needs 1 byte of extra clock before it starts waiting for the start token
-    if(ARDS_SpiSendSDIOCommand(ARDS_SDIO_CMD24_WRITE_SINGLE_BLOCK, sector, NULL, 1) != 0)
+    if(ARDS_SpiSendSDIOCommand2(sector, ARDS_SDIO_CMD24_WRITE_SINGLE_BLOCK | 0x40, 1) != 0)
         return false;
 
     // Send start token
@@ -202,12 +248,12 @@ bool ARDS_SDWriteSingleSector(u32 sector, const u8 * buffer)
 
     return timeout != 0;
 }
-
-bool ARDS_SDWriteMultipleSector(u32 sector, u32 num_sectors, const u8 * buffer) {
+// bool ARDS_SDWriteMultipleSector(u32 sector, u32 num_sectors, const u8 * buffer);
+bool ARDS_SDWriteMultipleSector2(u32 sector, u32 num_sectors, const u8 * buffer) {
     sector = isSdhc ? sector : sector << 9;
 
     // this message needs 1 byte of extra clock before it starts waiting for the start token
-    if(ARDS_SpiSendSDIOCommand(ARDS_SDIO_CMD25_WRITE_MULTIPLE_BLOCK, sector, NULL, 1) != 0)
+    if(ARDS_SpiSendSDIOCommand2(sector, ARDS_SDIO_CMD25_WRITE_MULTIPLE_BLOCK | 0x40, 1) != 0)
         return false;
 
     for(int i=0; i < num_sectors; i++)

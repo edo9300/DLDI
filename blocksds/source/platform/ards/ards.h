@@ -53,6 +53,6 @@ static inline u64 ARDS_CMD_F2(u32 param1, u8 param2) {
 
 bool ARDS_SDInitialize(void);
 bool ARDS_SDReadSingleSector(u32 sector, u8 * buffer);
-bool ARDS_SDReadMultipleSector(u32 sector, u32 num_sectors, u8 * buffer);
+bool ARDS_SDReadMultipleSector(u32 sector, u8 * buffer, u32 num_sectors);
 bool ARDS_SDWriteSingleSector(u32 sector, const u8 * buffer);
-bool ARDS_SDWriteMultipleSector(u32 sector, u32 num_sectors, const u8 * buffer);
+bool ARDS_SDWriteMultipleSector(u32 sector, const u8 * buffer, u32 num_sectors);
