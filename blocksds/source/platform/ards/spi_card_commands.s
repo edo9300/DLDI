@@ -17,11 +17,9 @@ BEGIN_ASM_FUNC_NO_SECTION ARDS_SendNtrCommandF2
 	movs    r2, #0xF2
 	ldr     r1, =REG_MCCNT0
 	@ loads REG_MCCMD0 in r1, we do this so that the only loaded constant is REG_MCCNT0, shared with other pieces of code
-	adds    r1, #8
 	lsls    r3, r0, #8
-	stmia   r1!, {r2, r3}
-	@ REG_MCCMD0 - REG_MCCNT0 = 8, stmia increased r1 by 4*2
-	subs    r1, #16
+	str     r2, [r1, #8]
+	str     r3, [r1, #12]
 
 	@ we shift 0xF2 above by 14 to get 0xXXXX8000
 	lsls    r2, #14
@@ -54,9 +52,21 @@ BEGIN_ASM_FUNC_NO_SECTION cardExt_EnableSpi2
 	strh    r3, [r1]
 	pop     {r0-r3,pc}
 
+@void ARDS_CycleSpi();
+BEGIN_ASM_FUNC_NO_SECTION ARDS_CycleSpi
+	push    {r0-r3, lr}
+	movs    r0, ARDS_CMD_F2_SPI_DISABLE
+	bl      ARDS_SendNtrCommandF2
+	bl      cardExt_EnableSpi2
+	bl      ARDS_ReadSpiByte
+	movs    r0, ARDS_CMD_F2_SPI_ENABLE
+	bl      ARDS_SendNtrCommandF2
+	bl      cardExt_EnableSpi2
+	pop     {r0-r3, pc}
+
 @ NOTE!!!: This function needs to set r0 last with mov or something similar so that it updates the zero flags
 @u8 ARDS_ReadSpiByte(void);
-BEGIN_ASM_FUNC_NO_SECTION ARDS_ReadSpiByte
+BEGIN_ASM_FUNC ARDS_ReadSpiByte
     movs r0, 0xFF
 @u8 cardExt_ReadWriteSpiByte2(u8);
 BEGIN_ASM_FUNC_NO_SECTION cardExt_ReadWriteSpiByte2
@@ -73,22 +83,13 @@ BEGIN_ASM_FUNC_NO_SECTION cardExt_ReadWriteSpiByte2
 	cmp     r0, #0
 	pop     {r1-r3, pc}
 
-@void ARDS_CycleSpi();
-BEGIN_ASM_FUNC ARDS_CycleSpi
-	push    {r0-r3, lr}
-	movs    r0, ARDS_CMD_F2_SPI_DISABLE
-	bl      ARDS_SendNtrCommandF2
-	bl      cardExt_EnableSpi2
-	bl      ARDS_ReadSpiByte
-	movs    r0, ARDS_CMD_F2_SPI_ENABLE
-	bl      ARDS_SendNtrCommandF2
-	bl      cardExt_EnableSpi2
-	pop     {r0-r3, pc}
-
 @u8 ARDS_ReadSpiByteTimeout(void);
 BEGIN_ASM_FUNC_NO_SECTION ARDS_ReadSpiByteTimeout
 	push    {r1-r4, lr}
-	ldr     r4, =ARDS_SD_CMD_TIMEOUT_LEN
+	@ use a timeout of 0x1000 instead of 0xFFF, easier to setup
+	@ ldr     r4, =ARDS_SD_CMD_TIMEOUT_LEN
+	movs    r4, #1
+	lsls    r4, #12
 1:
 	bl      ARDS_ReadSpiByte
 	cmp     r0, #0xFF
