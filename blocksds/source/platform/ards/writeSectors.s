@@ -26,6 +26,11 @@ write_sector_sdhc_label:
 	@ this message needs 1 byte of extra clock before it starts waiting for the start token
 	movs    r1, ARDS_SDIO_CMD25_WRITE_MULTIPLE_BLOCK
 	movs    r2, #1
+	
+	@ We use the r2 set above to put 0x10000 to use later as write timeout
+	@ it's 1 bigger than the timeout len but we save an instruction
+	@ ldr     r4, =ARDS_SD_WRITE_TIMEOUT_LEN	
+	lsls    r3, r2, #16
 
 	bl      ARDS_SpiSendSDIOCommand2
 	bne     CMD25_not_ok
@@ -51,9 +56,10 @@ write_next_byte:
 	bl      ARDS_ReadSpiByte
 
 	bl      ARDS_ReadSpiByte
-	movs    r3, #0x0f
-	ands    r0, r3
-	cmp     r0, ARDS_SD_WRITE_OK
+	@ movs    r2, #0x0f
+	@ ands    r0, r2
+	subs    r0, ARDS_SD_WRITE_OK
+	lsls    r0,#28
 	bne     write_command_failed
 
 	@ Wait for card to write data
@@ -75,14 +81,11 @@ write_next_byte:
 WaitSpiByteTimeout:
 	push    {r1-r7, lr}
 WaitSpiByteTimeoutSkipPush:
-	@ We do an extra clock for timeout to save a ldr instruction
-	@ ldr     r4, =ARDS_SD_WRITE_TIMEOUT_LEN
-	movs    r4, #1
-	lsls    r4, #16
+	@ In r3 we have the timeout variable set above
 wait_busy:
 	bl      ARDS_ReadSpiByte
 	bne     wait_no_longer_busy
-	subs    r4, #1
+	subs    r3, #1
 	bne     wait_busy
 
 CMD25_not_ok:
