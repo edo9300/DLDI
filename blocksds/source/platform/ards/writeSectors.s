@@ -13,7 +13,7 @@ BEGIN_ASM_FUNC ARDS_SDWriteMultipleSector
 	push    {r1-r7, lr}
 	movs    r4, r1
 	@ We get the number of bytes total to write, which we'll compare to against in the main loop
-	lsls    r6, r2, #9
+	lsls    r3, r2, #9
 
 	@ Total written bytes
 	movs    r5, #0
@@ -30,7 +30,7 @@ write_sector_sdhc_label:
 	@ We use the r2 set above to put 0x10000 to use later as write timeout
 	@ it's 1 bigger than the timeout len but we save an instruction
 	@ ldr     r4, =ARDS_SD_WRITE_TIMEOUT_LEN	
-	lsls    r3, r2, #16
+	lsls    r2, r2, #16
 
 	bl      ARDS_SpiSendSDIOCommand2
 	bne     CMD25_not_ok
@@ -56,17 +56,18 @@ write_next_byte:
 	bl      ARDS_ReadSpiByte
 
 	bl      ARDS_ReadSpiByte
-	@ movs    r2, #0x0f
-	@ ands    r0, r2
+	
+	@ we check if the lower nibble is equal to ARDS_SD_WRITE_OK
 	subs    r0, ARDS_SD_WRITE_OK
 	lsls    r0,#28
 	bne     write_command_failed
 
 	@ Wait for card to write data
-	bl      WaitSpiByteTimeout
+	bl      ARDS_WaitSpiByteTimeout
 	beq     sector_write_timeout_expired
 
-	cmp     r6, r5
+	@ r3 holds the total number of bytes to write
+	cmp     r3, r5
 	bne     write_next_sector
 
 	@ send stop token
@@ -76,25 +77,12 @@ write_next_byte:
 	@ send 1 byte clock
 	bl      ARDS_ReadSpiByte
 
-	b       WaitSpiByteTimeoutSkipPush
+	bl      ARDS_WaitSpiByteTimeout
 
-WaitSpiByteTimeout:
-	push    {r1-r7, lr}
-WaitSpiByteTimeoutSkipPush:
-	@ In r3 we have the timeout variable set above
-wait_busy:
-	bl      ARDS_ReadSpiByte
-	bne     wait_no_longer_busy
-	subs    r3, #1
-	bne     wait_busy
+	pop     {r1-r7, pc}
 
 CMD25_not_ok:
 write_command_failed:
 sector_write_timeout_expired:
 	movs    r0, #0
 	pop     {r1-r7, pc}
-
-wait_no_longer_busy:
-	movs    r0, #1
-	pop     {r1-r7, pc}
-

@@ -12,7 +12,7 @@
 .equ ARDS_SD_CMD_TIMEOUT_LEN, 0xFFF
 
 @void ARDS_SendNtrCommandF2(u8 param2);
-BEGIN_ASM_FUNC_NO_SECTION ARDS_SendNtrCommandF2
+BEGIN_ASM_FUNC ARDS_SendNtrCommandF2
 	push    {r0-r3,lr}
 	movs    r2, #0xF2
 	ldr     r1, =REG_MCCNT0
@@ -97,6 +97,26 @@ BEGIN_ASM_FUNC_NO_SECTION ARDS_ReadSpiByteTimeout
 	subs    r4, r4, #1
 	bne     1b
 1:
+	pop     {r1-r4, pc}
+
+@u8 ARDS_WaitSpiByteTimeout(void);
+BEGIN_ASM_FUNC_NO_SECTION ARDS_WaitSpiByteTimeout
+	push    {r1-r4, lr}
+	@ use a timeout of 0x1000 instead of 0xFFFF, easier to setup
+	@ ldr     r2, =ARDS_SD_WRITE_TIMEOUT_LEN
+	movs    r2, #1
+	lsls    r2, #16
+1:
+	bl      ARDS_ReadSpiByte
+	bne     1f
+	subs    r2, #1
+	bne     1b
+
+	movs    r0, #0
+	pop     {r1-r4, pc}
+
+1:
+	movs    r0, #1
 	pop     {r1-r4, pc}
 
 @ NOTE!!!: This function needs to set r0 last with mov or something similar so that it updates the zero flags
