@@ -26,14 +26,14 @@ write_sector_sdhc_label:
 	@ this message needs 1 byte of extra clock before it starts waiting for the start token
 	movs    r1, ARDS_SDIO_CMD25_WRITE_MULTIPLE_BLOCK
 	movs    r2, #1
+
+	bl      ARDS_SpiSendSDIOCommand2
+	bne     CMD25_not_ok
 	
 	@ We use the r2 set above to put 0x10000 to use later as write timeout
 	@ it's 1 bigger than the timeout len but we save an instruction
 	@ ldr     r4, =ARDS_SD_WRITE_TIMEOUT_LEN	
 	lsls    r2, r2, #16
-
-	bl      ARDS_SpiSendSDIOCommand2
-	bne     CMD25_not_ok
 
 write_next_sector:
 
