@@ -50,25 +50,6 @@
  #include "gba_types.h"
 #endif
 
-#define BYTES_PER_READ 512
-
-#ifndef NULL
- #define NULL 0
-#endif
-
-typedef struct {
-	vu16* data;
-	vu16* status;
-	vu16* command;
-	vu16* error;
-	vu16* sectorCount;
-	vu16* lba1;
-	vu16* lba2;
-	vu16* lba3;
-	vu16* lba4;
-} CF_REGISTERS;
-
-
 // CF Card status
 #define CF_STS_INSERTED		0x50
 #define CF_STS_REMOVED		0x00
@@ -89,6 +70,6 @@ bool _CF_clearStatus (void);
 bool _CF_readSectors (u32 sector, u32 numSectors, void* buffer);
 bool _CF_writeSectors (u32 sector, u32 numSectors, void* buffer);
 bool _CF_shutdown(void);
-bool _CF_startup(const CF_REGISTERS *usableCfRegs);
+bool _CF_startup();
 
 #endif // define IO_CF_COMMON_H

@@ -20,7 +20,7 @@ export TARGET		:=	$(shell basename $(CURDIR))
 BUILD		:=	build
 SOURCES		:=	source ../../common_source
 DATA		:=	data
-INCLUDES	:=	include ../../common_source
+INCLUDES	:=	include ../../common_source source
 
 
 #---------------------------------------------------------------------------------
