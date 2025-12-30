@@ -34,311 +34,106 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
 #include "io_cf_common.h"
 #include "io_cf_regs.h"
 
-//---------------------------------------------------------------
-// DMA
-#ifdef _IO_USE_DMA
- #ifndef NDS
-  #include "gba_dma.h"
- #else
-  #include <nds/dma.h>
-  #ifdef ARM9
-   #include <nds/arm9/cache.h>
-  #endif
- #endif
-#endif
-
 #define BYTES_PER_READ 512
 
-/*-----------------------------------------------------------------
-_CF_isInserted
-Is a compact flash card inserted?
-bool return OUT:  true if a CF card is inserted
------------------------------------------------------------------*/
-bool _CF_isInserted (void) {
-	// Change register, then check if value did change
-	CF_REG_STATUS = CF_STS_INSERTED;
-	return ((CF_REG_STATUS & 0xff) == CF_STS_INSERTED);
+bool _CF_isInserted(void) {
+    CF_REG_STATUS = CF_STS_INSERTED;
+    return ((CF_REG_STATUS & 0xff) == CF_STS_INSERTED);
 }
 
-
-/*-----------------------------------------------------------------
-_CF_clearStatus
-Tries to make the CF card go back to idle mode
-bool return OUT:  true if a CF card is idle
------------------------------------------------------------------*/
-bool _CF_clearStatus (void) {
-	int i;
-	
-	// Wait until CF card is finished previous commands
-	i=0;
-	while ((CF_REG_COMMAND & CF_STS_BUSY) && (i < CF_CARD_TIMEOUT)) {
-		i++;
-	}
-	
-	// Wait until card is ready for commands
-	i = 0;
-	while ((!(CF_REG_STATUS & CF_STS_INSERTED)) && (i < CF_CARD_TIMEOUT)) {
-		i++;
-	}
-	if (i >= CF_CARD_TIMEOUT)
-		return false;
-
-	return true;
-}
-
-bool _CF_readCardData(u32 sector, u32 numSectors, void* buffer) {
-	int i;
-
-	u16 *buff = (u16*)buffer;
-#ifdef _IO_ALLOW_UNALIGNED
-	u8 *buff_u8 = (u8*)buffer;
-	int temp;
-#endif
-
-#if (defined _IO_USE_DMA) && (defined NDS) && (defined ARM9)
-	DC_FlushRange( buffer, j * BYTES_PER_READ);
-#endif
-
-	// Wait until CF card is finished previous commands
-	i=0;
-	while ((CF_REG_COMMAND & CF_STS_BUSY) && (i < CF_CARD_TIMEOUT)) {
-		i++;
-	}
-	
-	// Wait until card is ready for commands
-	i = 0;
-	while ((!(CF_REG_STATUS & CF_STS_INSERTED)) && (i < CF_CARD_TIMEOUT)) {
-		i++;
-	}
-	if (i >= CF_CARD_TIMEOUT)
-		return false;
-	
-	// Set number of sectors to read
-	CF_REG_SECTOR_COUNT = (numSectors < 256 ? numSectors : 0);	// Read a maximum of 256 sectors, 0 means 256	
-	
-	// Set read sector
-	CF_REG_LBA1 = sector & 0xFF;						// 1st byte of sector number
-	CF_REG_LBA2 = (sector >> 8) & 0xFF;					// 2nd byte of sector number
-	CF_REG_LBA3 = (sector >> 16) & 0xFF;				// 3rd byte of sector number
-	CF_REG_LBA4 = ((sector >> 24) & 0x0F )| CF_CMD_LBA;	// last nibble of sector number
-	
-	// Set command to read
-	CF_REG_COMMAND = CF_CMD_READ;
-	
-	
-	while (numSectors--)
+bool _CF_clearStatus(void) {
+	for (int i = 0; i < CF_CARD_TIMEOUT; i++)
 	{
-		// Wait until card is ready for reading
-		i = 0;
-		while (((CF_REG_STATUS & 0xff)!= CF_STS_READY) && (i < CF_CARD_TIMEOUT))
+		if ((CF_REG_COMMAND & CF_STS_BUSY) == 0)
+			break;
+	}
+
+	for (int i = 0; i < CF_CARD_TIMEOUT; i++)
+	{
+		if ((CF_REG_STATUS & CF_STS_INSERTED) != 0)
 		{
-			i++;
+			return true;
 		}
-		if (i >= CF_CARD_TIMEOUT)
-			return false;
-		
-		// Read data
-#ifdef _IO_USE_DMA
- #ifdef NDS
-		DMA3_SRC = (u32)(&CF_REG_DATA);
-		DMA3_DEST = (u32)buff;
-		DMA3_CR = 256 | DMA_COPY_HALFWORDS | DMA_SRC_FIX;
- #else
-		DMA3COPY ( (&CF_REG_DATA), buff, 256 | DMA16 | DMA_ENABLE | DMA_SRC_FIXED);
- #endif
-		buff += BYTES_PER_READ / 2;
-#elif defined _IO_ALLOW_UNALIGNED
-		i=256;
-		if ((u32)buff_u8 & 0x01) {
-			while(i--)
-			{
-				temp = CF_REG_DATA;
-				*buff_u8++ = temp & 0xFF;
-				*buff_u8++ = temp >> 8;
-			}
-		} else {
-			while(i--)
-				*buff++ = CF_REG_DATA; 
-		}
-#else
-		i=256;
-		while(i--)
-			*buff++ = CF_REG_DATA; 
-#endif
 	}
-#if (defined _IO_USE_DMA) && (defined NDS)
-	// Wait for end of transfer before returning
-	while(DMA3_CR & DMA_BUSY);
-#endif
-	return true;
+
+    return false;
 }
 
-/*-----------------------------------------------------------------
-_CF_readSectors
-Read 512 byte sector numbered "sector" into "buffer"
-u32 sector IN: address of first 512 byte sector on CF card to read
-u32 numSectors IN: number of 512 byte sectors to read,
- 1 to 256 sectors can be read
-void* buffer OUT: pointer to 512 byte buffer to store data in
-bool return OUT: true if successful
------------------------------------------------------------------*/
-bool _CF_readSectors (u32 sector, u32 numSectors, void* buffer) {
-	while(numSectors > 0)
+static bool waitReady()
+{
+	for (int i = 0; i < CF_CARD_TIMEOUT; i++)
 	{
-		u32 sector_count;
-		sector_count = numSectors >= 256 ? 256 : numSectors;
-		if (!_CF_readCardData(sector, sector_count, buffer))
-			return false;
-		sector += sector_count;
-		numSectors -= sector_count;
-		buffer = (u8*)buffer + (0x200 * sector_count);
-	}
-	return true;
-}
-
-
-bool _CF_writeCardData(u32 sector, u32 numSectors, void* buffer) {
-	int i;
-
-	u16 *buff = (u16*)buffer;
-#ifdef _IO_ALLOW_UNALIGNED
-	u8 *buff_u8 = (u8*)buffer;
-	int temp;
-#endif
-	
-#if defined _IO_USE_DMA && defined NDS && defined ARM9
-	DC_FlushRange( buffer, j * BYTES_PER_READ);
-#endif
-
-	// Wait until CF card is finished previous commands
-	i=0;
-	while ((CF_REG_COMMAND & CF_STS_BUSY) && (i < CF_CARD_TIMEOUT))
-	{
-		i++;
-	}
-	
-	// Wait until card is ready for commands
-	i = 0;
-	while ((!(CF_REG_STATUS & CF_STS_INSERTED)) && (i < CF_CARD_TIMEOUT))
-	{
-		i++;
-	}
-	if (i >= CF_CARD_TIMEOUT)
-		return false;
-	
-	// Set number of sectors to write
-	CF_REG_SECTOR_COUNT = (numSectors < 256 ? numSectors : 0);	// Write a maximum of 256 sectors, 0 means 256	
-	
-	// Set write sector
-	CF_REG_LBA1 = sector & 0xFF;						// 1st byte of sector number
-	CF_REG_LBA2 = (sector >> 8) & 0xFF;					// 2nd byte of sector number
-	CF_REG_LBA3 = (sector >> 16) & 0xFF;				// 3rd byte of sector number
-	CF_REG_LBA4 = ((sector >> 24) & 0x0F )| CF_CMD_LBA;	// last nibble of sector number
-	
-	// Set command to write
-	CF_REG_COMMAND = CF_CMD_WRITE;
-	
-	while (numSectors--)
-	{
-		// Wait until card is ready for writing
-		i = 0;
-		while (((CF_REG_STATUS & 0xff) != CF_STS_READY) && (i < CF_CARD_TIMEOUT))
+		if ((CF_REG_STATUS & 0xff) == CF_STS_READY)
 		{
-			i++;
+			return true;
 		}
-		if (i >= CF_CARD_TIMEOUT)
-			return false;
-		
-		// Write data
-#ifdef _IO_USE_DMA
- #ifdef NDS
-		DMA3_SRC = (u32)buff;
-		DMA3_DEST = (u32)(&CF_REG_DATA);
-		DMA3_CR = 256 | DMA_COPY_HALFWORDS | DMA_DST_FIX;
- #else
-		DMA3COPY( buff, (&CF_REG_DATA), 256 | DMA16 | DMA_ENABLE | DMA_DST_FIXED);
- #endif
-		buff += BYTES_PER_READ / 2;
-#elif defined _IO_ALLOW_UNALIGNED
-		i=256;
-		if ((u32)buff_u8 & 0x01) {
-			while(i--)
-			{
-				temp = *buff_u8++;
-				temp |= *buff_u8++ << 8;
-				CF_REG_DATA = temp;
-			}
-		} else {
-		while(i--)
-			CF_REG_DATA = *buff++; 
-		}
-#else
-		i=256;
-		while(i--)
-			CF_REG_DATA = *buff++; 
-#endif
 	}
-#if defined _IO_USE_DMA && defined NDS
-	// Wait for end of transfer before returning
-	while(DMA3_CR & DMA_BUSY);
-#endif
+	return false;
+}
+
+static bool CF_PerformTransferSectors(u8 command, u32 sector, void* dataAddr, u32 numSectors)
+{
+    if (!_CF_clearStatus()) return false;
 	
-	return true;
+	u32* src = (command == CF_CMD_READ) ? (u32*)&CF_REG_DATA : (u32*)dataAddr;
+	u32* dst = (command == CF_CMD_READ) ? (u32*)dataAddr : (u32*)&CF_REG_DATA;
+
+    CF_REG_SECTOR_COUNT = (numSectors < 256 ? numSectors : 0);
+
+    CF_REG_LBA1 = sector & 0xFF;
+    CF_REG_LBA2 = (sector >> 8) & 0xFF;
+    CF_REG_LBA3 = (sector >> 16) & 0xFF;
+    CF_REG_LBA4 = ((sector >> 24) & 0x0F) | CF_CMD_LBA;
+
+    CF_REG_COMMAND = command;
+
+    while (numSectors--) {
+        if (!waitReady()) return false;
+		for(int i = 0; i < (BYTES_PER_READ / sizeof(u32)); ++i)
+		{
+			*dst++ = *src++;
+		}
+    }
+
+    return true;
 }
 
-/*-----------------------------------------------------------------
-_CF_writeSectors
-Write 512 byte sector numbered "sector" from "buffer"
-u32 sector IN: address of 512 byte sector on CF card to read
-u32 numSectors IN: number of 512 byte sectors to read,
- 1 to 256 sectors can be read
-void* buffer IN: pointer to 512 byte buffer to read data from
-bool return OUT: true if successful
------------------------------------------------------------------*/
-bool _CF_writeSectors (u32 sector, u32 numSectors, void* buffer) {
-	while(numSectors > 0)
-	{
-		u32 sector_count;
-		sector_count = numSectors >= 256 ? 256 : numSectors;
-		if (!_CF_writeCardData(sector, sector_count, buffer))
-			return false;
-		sector += sector_count;
-		numSectors -= sector_count;
-		buffer = (u8*)buffer + (0x200 * sector_count);
-	}
-	return true;
+static bool CF_PerformTransfer(u8 command, u32 sector, u32 numSectors, void* buffer) {
+    while (numSectors > 0) {
+        u32 sector_count;
+        sector_count = numSectors >= 256 ? 256 : numSectors;
+        if (!CF_PerformTransferSectors(command, sector, buffer, sector_count)) return false;
+        sector += sector_count;
+        numSectors -= sector_count;
+        buffer = (u8*)buffer + (0x200 * sector_count);
+    }
+    return true;
 }
 
-/*-----------------------------------------------------------------
-_CF_shutdown
-shutdown the CF interface
------------------------------------------------------------------*/
-bool _CF_shutdown(void) {
-	return _CF_clearStatus() ;
+bool _CF_readSectors(u32 sector, u32 numSectors, void* buffer) {
+	return CF_PerformTransfer(CF_CMD_READ, sector, numSectors, buffer);
 }
 
-/*-----------------------------------------------------------------
-_CF_startUp
-Initializes the CF interface using the supplied registers
-returns true if successful, otherwise returns false
------------------------------------------------------------------*/
+bool _CF_writeSectors(u32 sector, u32 numSectors, void* buffer) {
+	return CF_PerformTransfer(CF_CMD_WRITE, sector, numSectors, buffer);
+}
+
+bool _CF_shutdown(void) { return _CF_clearStatus(); }
+
 bool _CF_startup() {
-	// See if there is a read/write register
-	u16 temp = CF_REG_LBA1;
-	CF_REG_LBA1 = (~temp & 0xFF);
-	temp = (~temp & 0xFF);
-	if (!(CF_REG_LBA1 == temp)) {
-		return false;
-	}
-	// Make sure it is 8 bit
-	CF_REG_LBA1 = 0xAA55;
-	if (CF_REG_LBA1 == 0xAA55) {
-		return false;
-	}
-	return true;
-}
+    u16 temp = CF_REG_LBA1;
+    CF_REG_LBA1 = (~temp & 0xFF);
+    temp = (~temp & 0xFF);
+    if (!(CF_REG_LBA1 == temp)) {
+        return false;
+    }
 
+    CF_REG_LBA1 = 0xAA55;
+    if (CF_REG_LBA1 == 0xAA55) {
+        return false;
+    }
+    return true;
+}
