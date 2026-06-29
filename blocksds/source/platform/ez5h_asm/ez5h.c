@@ -14,12 +14,12 @@
 #include <libcart/sdcrc16.h>
 #include <libtwl/card/card.h>
 #include <nds/ndstypes.h>
-
+#include <string.h>
 #include "ez5h.h"
 
 static u32 isSDHC = 0;
 
-static u32 EZ5H_SendCommand(const u64 command) {
+u32 EZ5H_SendCommand(const u64 command) {
     return cardExt_RomReadData4Byte(command, EZ5H_CTRL_READ_4B);
 }
 
@@ -132,6 +132,54 @@ bool EZ5H_SDInitialize(void) {
     return true;
 }
 
+// Sends a clock, reads data from response index if available
+static inline u64 EZ5H_CMD_SDMC_SEND_CLK2(void) {
+    return EZ5H_CMD_SDMC_PARAM_CARD(1, 0, 0);
+}
+
+void cardExt_RomSendCommand2(u64 command, u32 flags) {
+    card_romSetCmd(command);
+    card_romStartXfer(flags | MCCNT1_LEN_0, false);
+    card_romWaitBusy();
+}
+
+static void EZ5H_SendCommand2(const u64 command) {
+    cardExt_RomSendCommand2(command, EZ5H_CTRL_READ_0);
+}
+
+bool EZ5H_SDSendSDIOCommand2(u8 cmd, u32 parameter);
+bool EZ5H_SDSendSDIOCommand22(u8 cmd, u32 parameter) {
+    int timeout = 0x10000;
+
+    EZ5H_SendCommand(EZ5H_CMD_SDMC_SDIO(cmd, parameter));
+
+    // Sends response in byte-swapped u32, with the starting marker
+    // Search for starting marker, with a timeout
+    while (EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CLK2()) & 0xFF) {
+        timeout--;
+        if (timeout == 0) return false;
+    }
+
+    return true;
+}
+
+bool EZ5H_SDReadSector2(u32 sector, void* buffer) {
+    if (!isSDHC) sector <<= 9;
+
+    if (!EZ5H_SDSendSDIOCommand2(17, sector)) return false;
+
+    cardExt_RomReadData(EZ5H_CMD_SDMC_READ_DATA, EZ5H_CTRL_READ_512B, buffer, 128);
+    return true;
+}
+
+void cardExt_RomSendWriteDataog(const u8* data)
+ {
+	u64 command = EZ5H_CMD_SDMC_WRITE_DATA(data);
+    card_romWaitBusy();
+    card_romSetCmd(command);
+    card_romStartXfer(EZ5H_CTRL_READ_0 | MCCNT1_LEN_0, false);
+}
+
 static uint64_t inline calSingleCRC16(uint64_t crc, uint32_t data_in){
 	// Shift out 8 bits for each line
 	uint32_t data_out = crc >> 32;
@@ -164,49 +212,124 @@ uint64_t sdio_crc16_4bit_checksum(void* dataBuf)
 
 	return __builtin_bswap64(crc);
 }
-bool EZ5H_SDSendSDIOCommand2(u8 cmd, u32 parameter);
 
-// Sends a clock, reads data from response index if available
-static inline u64 EZ5H_CMD_SDMC_SEND_CLK2(void) {
-    return EZ5H_CMD_SDMC_PARAM_CARD(1, 0, 0);
+inline u32 cardExt_RomReadData4ByteCustom(u64 command, u32 flags) {
+    card_romSetCmd(command);
+    card_romStartXfer(EZ5H_CTRL_READ_4B | MCCNT1_LEN_4, false);
+    card_romWaitDataReady();
+    return card_romGetData();
+}
+static inline void cardExt_RomSendWriteData(u16 data16) {
+	u8* data = (u8*)&data16;
+	u64 command = 0xF6B8;
+	command |= ((u64)(data[0]) << 24);
+	command |= ((u64)(data[0] >> 4) << 16);
+	command |= ((u64)(data[1]) << 40);
+	command |= ((u64)(data[1] >> 4) << 32);
+   *(vu64*)&REG_MCCMD0 = command;
+    card_romWaitBusy();
+    card_romStartXfer(EZ5H_CTRL_READ_0 | MCCNT1_LEN_0, false);
+}
+static void [[gnu::noinline]] cardExt_RomSendWriteData2(u8* data) {
+	volatile u64 a = EZ5H_CMD_SDMC_WRITE_DATA(data);
+	// u64 command = __builtin_bswap64(a);
+	// command |= ((u64)(data[0]) << 24);
+	// command |= ((u64)(data[0] >> 4) << 16);
+	// command |= ((u64)(data[1]) << 40);
+	// command |= ((u64)(data[1] >> 4) << 32);
+   // *(vu64*)&REG_MCCMD0 = command;
+   card_romSetCmd(a);
+    card_romStartXfer(EZ5H_CTRL_READ_0 | MCCNT1_LEN_0, false);
+    card_romWaitBusy();
 }
 
-void cardExt_RomSendWriteData(const u8* datab);
-void cardExt_RomSendWriteDataShort(u16 data);
+void cardExt_RomSendWriteDatacool(const u8* datab)
+ {
+    u8* base = (u8*)&REG_MCCMD0;
+    *((u16*)base) = __builtin_bswap64(EZ5H_CMD_SDMC | 0x00F6000000000000ull);
+	
+	u16 data;
+	memcpy(&data, datab, 2);
 
-u32 EZ5H_SendCommand3_c(const u32 command_low, const u32 command_high);
+	// command |= ((u64)(data[0]) << 24);
+	// command |= ((u64)(data[0] >> 4) << 16);
+	// command |= ((u64)(data[1]) << 40);
+	// command |= ((u64)(data[1] >> 4) << 32);
 
-#define EZ5H_SendCommand(command) EZ5H_SendCommand3_c(__builtin_bswap32((unsigned)(command >> 32)),((unsigned)command))
+    *(base + 3) = data | 0xF0;
+    data >>= 4;
+    *(base + 2) = data | 0xF0;
+    data >>= 4;
+    *(base + 5) = data | 0xF0;
+    data >>= 4;
+    *(base + 4) = data | 0xF0;
+    card_romWaitBusy();
+    card_romStartXfer(EZ5H_CTRL_READ_0 | MCCNT1_LEN_0, false);
+}
 
-bool EZ5H_SDWriteSectorw(u32 sector, const u8* buffer) {
+
+bool EZ5H_SDWriteSector(u32 sector, const u8* buffer) {
     if (!isSDHC) sector <<= 9;
 
-    u64 crc16 = sdio_crc16_4bit_checksum(buffer);
+	// u16 crc16buff[4];
+	// {
+		u64 crc16 = sdio_crc16_4bit_checksum(buffer);
+		// __builtin_memcpy(crc16buff, &crc16, 8);
+	// }
+	// u16* crc16buff = (u16*)&crc16;
 
     // CMD24
     if (!EZ5H_SDSendSDIOCommand2(24 | 0x40, sector)) return false;
 
     // This command needs an additional clock before sending data.
-    EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CLK2());
+    (void)EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CLK2());
 
     // Send data start marker.
     u16 start_marker = 0xF0FF;
-	cardExt_RomSendWriteDataShort(start_marker);
+	
+    // u8 start_marker[2] = {0xFF, 0xF0};
+	cardExt_RomSendWriteData(start_marker);
 
+    // EZ5H_SendCommand2(EZ5H_CMD_SDMC_WRITE_DATA(start_marker));
+#if 0
+    cardExt_RomSendWriteDatacool(start_marker);
+#endif
+
+#if 1
     // Write data.
     for (u32 i = 0; i < 512; i += 2) {
-        cardExt_RomSendWriteData((buffer + i));
+        cardExt_RomSendWriteData2((buffer + i));
+    }
+    // Write CRC data.
+    for (u32 i = 0; i < 8; i += 1) {
+        cardExt_RomSendWriteData2((((u8*)&crc16) + i));
+    }
+#else
+    // Write data.
+    for (u32 i = 0; i < 512; i += 2) {
+        cardExt_RomSendCommand(EZ5H_CMD_SDMC_WRITE_DATA(buffer + i), EZ5H_CTRL_READ_0);
     }
     // Write CRC data.
     for (u32 i = 0; i < 8; i += 2) {
-        cardExt_RomSendWriteData((((u8*)&crc16) + i));
+        cardExt_RomSendCommand(EZ5H_CMD_SDMC_WRITE_DATA(((u8*)&crc16) + i), EZ5H_CTRL_READ_0);
     }
+#endif
+#if 0
+    // Write data.
+    for (u32 i = 0; i < 512; i += 2) {
+        cardExt_RomSendWriteDatacool((buffer + i));
+    }
+    // Write CRC data.
+    for (u32 i = 0; i < 8; i += 1) {
+        cardExt_RomSendWriteDatacool(((u8*)&crc16) + i);
+    }
+    card_romWaitBusy();
+#endif
 
     // Wait until CRC starts
     while (EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CRC_STATUS) & 0x1);
 
     // Read CRC status
-    EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CRC_STATUS);
     while ((EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CRC_STATUS) & 0x1) != 0x1);
 
     // Wait until card ready
