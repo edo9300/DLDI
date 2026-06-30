@@ -212,8 +212,8 @@ ez5h_sdhc_write_label:
 	bl write_trampoline
 
 	@ load buffer addr that was pushed at the start
-	ldr r0, [sp,#4]
-	mov r1, sp
+	@ sdio4BitCrc16 will get the arguments directly from the stack
+	@ and return the buffer address in r0
 	@ bl ez5h_sdio4BitCrc16
 	ldr r7, ez5h_writeSector_sdio4BitCrc16
 	bl write_trampoline
@@ -324,10 +324,13 @@ ez5h_writeSector_sdio4BitCrc16:
 @ 	*out = __builtin_bswap64(crc);
 @ }
 
-@ void sdio_crc16_4bit_checksum(void*, uint64_t* out)
-@ no reg is touched
+@ void sdio_crc16_4bit_checksum(void* inbuff, uint64_t* out)
+@ args are passed on the stack:
+@ inbuff = sp+4
+@ out = sp
 BEGIN_ASM_FUNC ez5h_sdio4BitCrc16
-	@ push {r5}
+	ldr r0, [sp,#4]
+	mov r1, sp
     push {r0,r2,r3,r4-r5,r6,lr}
     movs r4, #0 @ r4 = crc_lo
     movs r5, #0 @ r5 = crc_hi
