@@ -265,20 +265,19 @@ byteSwap32:
 
 @ bool EZ5H_SDWriteSector(u32 sector, void* buffer)
 BEGIN_ASM_FUNC EZ5H_SDWriteSector
-	push	{r0, r1, r4, r5, r6, r7, lr}
-	movs	r5, r0
+	push	{r0, r1, r4-r6, lr}
 
 sdhc_write_label:
-	lsls	r1, r5, #9
+	lsls r1, r0, #9
 
-	movs	r0, #0x58
+	movs r0, #0x58
 	bl	EZ5H_SDSendSDIOCommand2
 	cmp	r0, #0
 	beq	sdio_fail_write
 
 	@ EZ5H_SDSendSDIOCommand2 returned us EZ5H_CMD_SDMC_SEND_CLK(1) in r0-r1
 	@ save low word of command
-	movs r7, r0
+	movs r6, r0
 	bl	EZ5H_SendCommand3
 
 	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
@@ -287,26 +286,26 @@ sdhc_write_label:
 
 	bl	cardExt_RomSendWriteDataShort
 
-	@ load buffer that was pushed at the start
+	@ load buffer addr that was pushed at the start
 	ldr r0, [sp,#4]
 	mov r1, sp
 	bl	sccmn_sdio4BitCrc16
 
 	@ r0 is the data buffer left untouched by the above function call
 	@ and it gets automatically incremented in cardExt_RomSendWriteData
-	movs r4, #0x80
-	lsls r4, #2
+	movs r4, #0xFF
 write_data_loop:
 	bl	cardExt_RomSendWriteData
-	subs r4, #2
-	bne	write_data_loop
+	@ do 0x100 iterations
+	subs r4, #1
+	bge	write_data_loop
 
 	@ r0 gets automatically incremented in cardExt_RomSendWriteData
 	mov	r0, sp
-	movs r4, #8
+	movs r4, #4
 write_crc_loop:
 	bl	cardExt_RomSendWriteData
-	subs r4, #2
+	subs r4, #1
 	bne	write_crc_loop
 
 	@ load EZ5H_CMD_SDMC_SEND_CRC_STATUS
@@ -325,7 +324,7 @@ crc_read_wait:
 	bcc crc_read_wait
 
 	@ load backed up EZ5H_CMD_SDMC_SEND_CLK(1), r1 is already setup as 0 from before
-	movs r0, r7
+	movs r0, r6
 	movs r4, #0xFF
 wait_card_ready:
 	bl	EZ5H_SendCommand3
@@ -334,7 +333,7 @@ wait_card_ready:
 
 sdio_fail_write:
 	@ r0 either is 0 or is EZ5H_CMD_SDMC_SEND_CLK(1) (thus nonzero)
-	pop	{r1, r2, r4, r5, r6, r7, pc}
+	pop	{r1, r2, r4-r6, pc}
 .pool
 
 
