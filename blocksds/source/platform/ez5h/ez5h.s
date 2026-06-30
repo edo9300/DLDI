@@ -511,12 +511,13 @@ check_next_sector:
 
 	movs r0, #0x1
 sderror:
-	pop {r3-r7,pc}
+	pop {r3-r7}
+	b r7_interwork
 
 parse_next_sector:
 	movs r1, r5
 	movs r0, r4
-	bl call_sd_function
+	bl r7_interwork
 	cmp r0, #0x0
 	beq sderror
 
@@ -526,7 +527,7 @@ parse_next_sector:
 	adds r4, #0x1
 	b check_next_sector
 
-call_sd_function:
+r7_interwork:
 	bx	r7
 
 .balign 4
