@@ -291,20 +291,25 @@ sdhc_write_label:
 
 	bl	cardExt_RomSendWriteDataShort
 
-	movs r3, #0x80
-	lsls r3, #2
+	movs	r3, #0x80
+	lsls	r3, r3, #2
+	adds	r6, r4, r3
 write_data_loop:
+	movs	r0, r4
+	adds	r4, #2
 	bl	cardExt_RomSendWriteData
-	subs r3, #2
+	cmp	r4, r6
 	bne	write_data_loop
 
-	movs r3, #8
-	mov	r0, sp
+	movs	r4, #0
 write_crc_loop:
+	mov	r0, sp
+	adds	r0, r4
+	adds	r4, #2
 	bl	cardExt_RomSendWriteData
-	subs r3, #2
+	cmp	r4, #8
 	bne	write_crc_loop
-	movs r4, #1
+	subs	r4, r4, #7
 
 	@ load EZ5H_CMD_SDMC_SEND_CRC_STATUS
 	movs	r1, #0
@@ -347,7 +352,6 @@ sdio_fail_write:
 @cardExt_RomSendWriteData(const u8* datab)
 BEGIN_ASM_FUNC cardExt_RomSendWriteData
 	ldrh r1, [r0]
-	adds r0, #2
 BEGIN_ASM_FUNC_NO_SECTION cardExt_RomSendWriteDataShort
 	push {r0,lr}
 	adr r0,send_writedata_data
