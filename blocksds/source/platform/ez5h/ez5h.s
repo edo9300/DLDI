@@ -291,6 +291,7 @@ sdhc_write_label:
 
 	bl	cardExt_RomSendWriteDataShort
 
+	@ r0 gets automatically incremented in cardExt_RomSendWriteData
 	movs r0, r4
 	movs r4, #0x80
 	lsls r4, #2
@@ -299,38 +300,32 @@ write_data_loop:
 	subs r4, #2
 	bne	write_data_loop
 
-	movs r4, #8
+	@ r0 gets automatically incremented in cardExt_RomSendWriteData
 	mov	r0, sp
+	movs r4, #8
 write_crc_loop:
 	bl	cardExt_RomSendWriteData
 	subs r4, #2
 	bne	write_crc_loop
 
-	@ movs r4, #1
 	@ load EZ5H_CMD_SDMC_SEND_CRC_STATUS
 	movs r1, #0
 	movs r0, r5
 crc_start_wait:
 	bl	EZ5H_SendCommand3
 	lsrs r2, #1
-	@ movs	r3, r2
-	@ ands	r3, r4
-	@ tst	r2, r4
 	bcs	crc_start_wait
 
+	@ send single crc read clock
 	bl	EZ5H_SendCommand3
-	@ movs	r4, #1
-
 crc_read_wait:
 	bl	EZ5H_SendCommand3
 	lsrs r2, #1
-	@ tst	r2, r4
 	bcc crc_read_wait
 
 	movs	r4, #0xFF
 	@ pop {r0,r1}
 wait_card_ready:
-	@ ldr	r0, =0x0001FAB8
 	@ load backed up EZ5H_CMD_SDMC_SEND_CLK(1)
 	movs r0, r7
 	bl	EZ5H_SendCommand3
