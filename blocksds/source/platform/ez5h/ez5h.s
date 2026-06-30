@@ -134,7 +134,8 @@ ez5h_sdhc_read_label:
 
 	movs r0,#0x51
     @ call ez5h_sendSDIOCommand
-    bl tramp
+    @ bl tramp
+	CALL_NO_INTERWORK r9
 	cmp r0,#0
 	beq sdio_fail
 
@@ -174,8 +175,8 @@ check_busy:
 
 sdio_fail:
 	pop	 {r4-r7,pc}
-tramp:
-	bx r7
+@ tramp:
+	@ bx r7
 .balign 4
 read_sector_data:
 	.word EZ5H_CMD_SDMC_READ_DATA_LOWER_WORD
@@ -195,11 +196,11 @@ ez5h_sdhc_write_label:
 	lsls r1, r0, #9
 
 	movs r0, #0x58
-	ldr r7, ez5h_writeSector_sendCommand
+	@ ldr r7, ez5h_writeSector_sendCommand
 	@ sendCommand+0x28 = ez5h_writeSector_sendSDIOCommand
-	adds r7, 0x2A
+	@ adds r7, 0x2A
 	@ bl write_trampoline
-	CALL_NO_INTERWORK r7
+	CALL_NO_INTERWORK r9
 	cmp r0, #0
 	beq sdio_fail_write
 
@@ -207,27 +208,29 @@ ez5h_sdhc_write_label:
 	@ save low word of command
 	movs r6, r0
 	@ subs r7, 0x28
-	ldr r7, ez5h_writeSector_sendCommand
+	@ ldr r7, ez5h_writeSector_sendCommand
 	@ bl write_trampoline
-	CALL_NO_INTERWORK r7
+	CALL_NO_INTERWORK r10
 	@ bl ez5h_sendCommand
 
 	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
-	ldr r1, =0xF8B8F0FF
-	lsrs r5, r1, #16
+	adr r0, write_tokens_label
+	ldrh r5, [r0,#2]
+	@ lsrs r5, r1, #16
 
 	@ bl ez5h_sendWriteDataRomCommandShort
-	ldr r7, ez5h_writeSector_sendWriteDataRomCommand
-	adds r4, r7, #4
-	CALL_NO_INTERWORK r4
+	@ ldr r7, ez5h_writeSector_sendWriteDataRomCommand
+	@ movs r4, #4
+	@ add r4, r11
+	CALL_NO_INTERWORK r11
 	@ bl write_trampoline
 
 	@ load buffer addr that was pushed at the start
 	@ sdio4BitCrc16 will get the arguments directly from the stack
 	@ and return the buffer address in r0
 	@ bl ez5h_sdio4BitCrc16
-	ldr r4, ez5h_writeSector_sdio4BitCrc16
-	CALL_NO_INTERWORK r4
+	@ ldr r4, ez5h_writeSector_sdio4BitCrc16
+	CALL_NO_INTERWORK r12
 	@ ldr r7, ez5h_writeSector_sdio4BitCrc16
 	@ bl write_trampoline
 
@@ -239,7 +242,7 @@ ez5h_sdhc_write_label:
 1:
 	@ bl ez5h_sendWriteDataRomCommand
 	@ bl write_trampoline
-	CALL_NO_INTERWORK r7
+	CALL_NO_INTERWORK r11
 	@ do 0x100 iterations
 	subs r3, #1
 	bge 1b
@@ -251,11 +254,11 @@ ez5h_sdhc_write_label:
 1:
 	@ bl ez5h_sendWriteDataRomCommand
 	@ bl write_trampoline
-	CALL_NO_INTERWORK r7
+	CALL_NO_INTERWORK r11
 	subs r3, #1
 	bge 1b
 
-	ldr r7, ez5h_writeSector_sendCommand
+	@ ldr r7, ez5h_writeSector_sendCommand
 	@ wait crc status start acknowledgment
 	@ load EZ5H_CMD_SDMC_SEND_CRC_STATUS
 	movs r1, #0
@@ -263,7 +266,7 @@ ez5h_sdhc_write_label:
 1:
 	@ bl ez5h_sendCommand
 	@ bl write_trampoline
-	CALL_NO_INTERWORK r7
+	CALL_NO_INTERWORK r10
 	lsrs r2, #1
 	bcs 1b
 
@@ -276,7 +279,7 @@ ez5h_sdhc_write_label:
 1:
 	@ bl ez5h_sendCommand
 	@ bl write_trampoline
-	CALL_NO_INTERWORK r7
+	CALL_NO_INTERWORK r10
 	lsrs r2, #1
 	bcc 1b
 
@@ -287,7 +290,7 @@ ez5h_sdhc_write_label:
 1:
 	@ bl ez5h_sendCommand
 	@ bl write_trampoline
-	CALL_NO_INTERWORK r7
+	CALL_NO_INTERWORK r10
 	tst r2, r4
 	bne 1b
 
@@ -296,18 +299,21 @@ sdio_fail_write:
 	pop	{r1-r2,r4-r7,pc}
 @ write_trampoline:
 	@ bx r7
+.balign 4
 .pool
+write_tokens_label:
+	.word 0xF8B8F0FF
 
-.global ez5h_writeSector_sendCommand
-.global ez5h_writeSector_sendWriteDataRomCommand
-.global ez5h_writeSector_sdio4BitCrc16
+@ .global ez5h_writeSector_sendCommand
+@ .global ez5h_writeSector_sendWriteDataRomCommand
+@ .global ez5h_writeSector_sdio4BitCrc16
 
-ez5h_writeSector_sendCommand:
-	.word 0
-ez5h_writeSector_sendWriteDataRomCommand:
-	.word 0
-ez5h_writeSector_sdio4BitCrc16:
-	.word 0
+@ ez5h_writeSector_sendCommand:
+	@ .word 0
+@ ez5h_writeSector_sendWriteDataRomCommand:
+	@ .word 0
+@ ez5h_writeSector_sdio4BitCrc16:
+	@ .word 0
 
 
 @ static uint64_t inline calSingleCRC16(uint64_t crc, uint32_t data_in){
@@ -411,7 +417,6 @@ byteSwap32:
 BEGIN_ASM_FUNC ez5h_sendWriteDataRomCommand
 	ldrh r1, [r0]
 	adds r0, #2
-BEGIN_ASM_FUNC_NO_SECTION ez5h_sendWriteDataRomCommandShort
 	push {r0,r3}
 	adr r0,send_writedata_data
 	@ r0 holds EZ5H_CTRL_READ_0
@@ -466,7 +471,8 @@ BEGIN_ASM_FUNC_NO_SECTION ez5h_readMultipleSector
 	ldr	r3, ez5h_readSector_addr
 save_regs_and_switch_to_thumb:
 	push {r4-r12,lr}
-	adr r4, doSDOperation
+	adr r4, sdio_functions
+	ldmia r4!, {r9,r10,r11,r12}
 	orr r4, #1
 	bl trampoline
 	pop {r4-r12,lr}
@@ -475,6 +481,21 @@ trampoline:
 	bx r4
 
 .thumb
+.global ez5h_writeSector_sendSDIOCommand
+.global ez5h_writeSector_sendCommand
+.global ez5h_writeSector_sendWriteDataRomCommand
+.global ez5h_writeSector_sdio4BitCrc16
+
+sdio_functions:
+ez5h_writeSector_sendSDIOCommand:
+	.word 0
+ez5h_writeSector_sendCommand:
+	.word 0
+ez5h_writeSector_sendWriteDataRomCommand:
+	.word 0
+ez5h_writeSector_sdio4BitCrc16:
+	.word 0
+
 @ bool doOperation(uint32_t sector, uint32_t num_sectors, void* buffer, bool(*operation)(u32 sector, void* buffer))
 @ BEGIN_ASM_FUNC_NO_SECTION doSDOperation thumb
 doSDOperation:
@@ -515,3 +536,4 @@ ez5h_readSector_addr:
 .global ez5h_writeSector_addr
 ez5h_writeSector_addr:
 	.word 0
+

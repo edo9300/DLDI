@@ -94,6 +94,7 @@ extern uint32_t read_ez5h_sendSDIOCommand_label;
 extern uint16_t ez5h_sdhc_read_label;
 extern uint16_t ez5h_sdhc_write_label;
 
+extern u32 ez5h_writeSector_sendSDIOCommand;
 extern u32 ez5h_writeSector_sendCommand;
 
 extern u32 ez5h_writeSector_sendWriteDataRomCommand;
@@ -111,6 +112,7 @@ bool EZ5H_SDInitialize(void) {
 	ez5h_writeSector_addr = (unsigned)&ez5h_writeSector;
 	read_ez5h_sendSDIOCommand_label = (unsigned)&ez5h_sendSDIOCommand;
 
+	ez5h_writeSector_sendSDIOCommand = (unsigned)&ez5h_sendSDIOCommand;
 	ez5h_writeSector_sendCommand = (unsigned)&ez5h_sendCommand;
 
 	ez5h_writeSector_sendWriteDataRomCommand = (unsigned)&ez5h_sendWriteDataRomCommand;
