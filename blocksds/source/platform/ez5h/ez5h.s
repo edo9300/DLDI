@@ -112,7 +112,8 @@ BEGIN_ASM_FUNC ez5h_readSector
 	push {r4-r7,lr}
 	movs r6,r1
 
-sdhc_read_label:
+.global ez5h_sdhc_read_label
+ez5h_sdhc_read_label:
 	lsls r1,r0,#9
 
 	movs r0,#0x51
@@ -174,7 +175,8 @@ read_sector_data:
 BEGIN_ASM_FUNC ez5h_writeSector
 	push {r0-r1,r4-r6,lr}
 
-sdhc_write_label:
+.global ez5h_sdhc_write_label
+ez5h_sdhc_write_label:
 	lsls r1, r0, #9
 
 	movs r0, #0x58
@@ -388,3 +390,47 @@ send_writedata_data:
 	.word EZ5H_CTRL_READ_0
 	.word 0xF6B8
 	.word REG_MCCNT0
+
+BEGIN_ASM_FUNC doOperation
+	push	{r3, r4, r5, r6, r7, lr}
+	movs	r4, r0
+	movs	r5, r2
+	movs	r7, r3
+	adds	r6, r0, r1
+label0:
+	cmp	r4, r6
+	bne	label2
+	movs	r0, #0x1
+label1:
+	pop	{r3, r4, r5, r6, r7}
+	pop	{r1}
+	bx	r1
+label2:
+	movs	r1, r5
+	movs	r0, r4
+	bl	trampoline
+	cmp	r0, #0x0
+	beq	label1
+
+	movs	r3, #0x80
+	lsls	r3, r3, #0x2
+	adds	r4, #0x1
+	adds	r5, r5, r3
+	b	label0
+trampoline:
+	bx	r7
+
+BEGIN_ASM_FUNC_NO_SECTION EZ5H_ReadSectors
+	ldr	r3, readSector_addr
+	b doOperation
+
+BEGIN_ASM_FUNC_NO_SECTION EZ5H_WriteSectors
+	ldr	r3, writeSector_addr
+	b doOperation
+.balign 4
+.global readSector_addr
+readSector_addr:
+.word 0
+.global writeSector_addr
+writeSector_addr:
+.word 0

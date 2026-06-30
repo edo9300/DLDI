@@ -10,6 +10,9 @@
 
 #define BYTES_PER_READ 512
 
+bool EZ5H_ReadSectors(uint32_t sector, uint32_t num_sectors, void* buffer);
+bool EZ5H_WriteSectors(uint32_t sector, uint32_t num_sectors, const void* buffer);
+
 // Initialize the driver. Returns true on success.
 bool EZ5H_Startup(void) {
     return EZ5H_SDInitialize();
@@ -25,11 +28,9 @@ bool EZ5H_ClearStatus(void) {
     return true;
 }
 
-// Reads 512 byte sectors into a buffer that may be unaligned. Returns true on
-// success.
-bool EZ5H_ReadSectors(uint32_t sector, uint32_t num_sectors, void* buffer) {
+[[gnu::noinline]] static bool doOperation(uint32_t sector, uint32_t num_sectors, void* buffer, bool(*operation)(u32 sector, void* buffer)){
     for (int i = 0; i < num_sectors; i++) {
-        bool result = ez5h_readSector(sector, buffer);
+        bool result = operation(sector, buffer);
         if (!result) return false;
         sector++;
         buffer = (u8*)buffer + 0x200;
@@ -37,16 +38,30 @@ bool EZ5H_ReadSectors(uint32_t sector, uint32_t num_sectors, void* buffer) {
     return true;
 }
 
+// Reads 512 byte sectors into a buffer that may be unaligned. Returns true on
+// success.
+bool EZ5H_ReadSectors2(uint32_t sector, uint32_t num_sectors, void* buffer) {
+	return doOperation(sector, num_sectors, buffer, ez5h_readSector);
+    // for (int i = 0; i < num_sectors; i++) {
+        // bool result = ez5h_readSector(sector, buffer);
+        // if (!result) return false;
+        // sector++;
+        // buffer = (u8*)buffer + 0x200;
+    // }
+    // return true;
+}
+
 // Writes 512 byte sectors from a buffer that may be unaligned. Returns true on
 // success.
-bool EZ5H_WriteSectors(uint32_t sector, uint32_t num_sectors, const void* buffer) {
-    for (int i = 0; i < num_sectors; i++) {
-        bool result = ez5h_writeSector(sector, buffer);
-        if (!result) return false;
-        sector++;
-        buffer = (u8*)buffer + 0x200;
-    }
-    return true;
+bool EZ5H_WriteSectorsa(uint32_t sector, uint32_t num_sectors, const void* buffer) {
+	return doOperation(sector, num_sectors, buffer, ez5h_writeSector);
+    // for (int i = 0; i < num_sectors; i++) {
+        // bool result = ez5h_writeSector(sector, buffer);
+        // if (!result) return false;
+        // sector++;
+        // buffer = (u8*)buffer + 0x200;
+    // }
+    // return true;
 }
 
 // Shutdowns the card. This may never be called.

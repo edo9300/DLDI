@@ -88,11 +88,14 @@ static bool EZ5H_SDSendSDIOCommand(u8 cmd, u32 parameter, u8* buffer, int size) 
     return true;
 }
 
-u32 EZ5H_SRAMReadData(u32 address) {
-    return EZ5H_SendCommand(EZ5H_CMD_SRAM_READ_DATA(address));
-}
+extern uint32_t readSector_addr;
+extern uint32_t writeSector_addr;
+extern uint16_t ez5h_sdhc_read_label;
+extern uint16_t ez5h_sdhc_write_label;
 
 bool EZ5H_SDInitialize(void) {
+	readSector_addr = (unsigned)&ez5h_readSector;
+	writeSector_addr = (unsigned)&ez5h_writeSector;
     u8 response[17] = {};
     register bool isSD20 = false;
 
@@ -129,87 +132,14 @@ bool EZ5H_SDInitialize(void) {
     EZ5H_SDSendSDIOCommand(SDIO_CMD55_APP_CMD, (sdio_rca << 16), NULL, 6);
     EZ5H_SDSendSDIOCommand(SDIO_ACMD6_SET_BUS_WIDTH, 2, NULL, 6);
     EZ5H_SDSendSDIOCommand(SDIO_CMD16_SET_BLOCK_LEN, 512, NULL, 6);
-    return true;
-}
-
-static uint64_t inline calSingleCRC16(uint64_t crc, uint32_t data_in){
-	// Shift out 8 bits for each line
-	uint32_t data_out = crc >> 32;
-	crc <<= 32;
-
-	// XOR outgoing data to itself with 4 bit delay
-	data_out ^= (data_out >> 16);
-
-	// XOR incoming data to outgoing data with 4 bit delay
-	data_out ^= (data_in >> 16);
-
-	// XOR outgoing and incoming data to accumulator at each tap
-	uint64_t xorred = data_out ^ data_in;
-	crc ^= xorred;
-	crc ^= xorred << (5 * 4);
-	crc ^= xorred << (12 * 4);
-	return crc;
-}
-uint64_t sdio_crc16_4bit_checksum(void* dataBuf)
-{
-	uint32_t num_words = 512 / sizeof(uint32_t);
-	uint64_t crc = 0;
-    uint32_t* data = (uint32_t*)(dataBuf);
-    uint32_t* end = data + num_words;
-    while (data < end)
-    {
-        uint32_t data_in = __builtin_bswap32(*data++);
-        crc = calSingleCRC16(crc, data_in);
-    }
-
-	return __builtin_bswap64(crc);
-}
-bool EZ5H_SDSendSDIOCommand2(u8 cmd, u32 parameter);
-
-// Sends a clock, reads data from response index if available
-static inline u64 EZ5H_CMD_SDMC_SEND_CLK2(void) {
-    return EZ5H_CMD_SDMC_PARAM_CARD(1, 0, 0);
-}
-
-void cardExt_RomSendWriteData(const u8* datab);
-void cardExt_RomSendWriteDataShort(u16 data);
-
-u32 EZ5H_SendCommand3_c(const u32 command_low, const u32 command_high);
-
-#define EZ5H_SendCommand(command) EZ5H_SendCommand3_c(__builtin_bswap32((unsigned)(command >> 32)),((unsigned)command))
-
-bool EZ5H_SDWriteSectorw(u32 sector, const u8* buffer) {
-    if (!isSDHC) sector <<= 9;
-
-    u64 crc16 = sdio_crc16_4bit_checksum(buffer);
-
-    // CMD24
-    if (!EZ5H_SDSendSDIOCommand2(24 | 0x40, sector)) return false;
-
-    // This command needs an additional clock before sending data.
-    EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CLK2());
-
-    // Send data start marker.
-    u16 start_marker = 0xF0FF;
-	cardExt_RomSendWriteDataShort(start_marker);
-
-    // Write data.
-    for (u32 i = 0; i < 512; i += 2) {
-        cardExt_RomSendWriteData((buffer + i));
-    }
-    // Write CRC data.
-    for (u32 i = 0; i < 8; i += 2) {
-        cardExt_RomSendWriteData((((u8*)&crc16) + i));
-    }
-
-    // Wait until CRC starts
-    while (EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CRC_STATUS) & 0x1);
-
-    // Read CRC status
-    EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CRC_STATUS);
-    while ((EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CRC_STATUS) & 0x1) != 0x1);
-
-    // Wait until card ready
-    while (EZ5H_SendCommand(EZ5H_CMD_SDMC_SEND_CLK2()) & 0xFF);
+	const uint16_t non_sdhc_opcode = 0x0241; //lsls r1,r0,#9
+	const uint16_t sdhc_opcode = 0x0001; //movs r1,r0
+	if(isSDHC) {
+		ez5h_sdhc_read_label = sdhc_opcode;
+		ez5h_sdhc_write_label = sdhc_opcode;
+	} else {
+		ez5h_sdhc_read_label = non_sdhc_opcode;
+		ez5h_sdhc_write_label = non_sdhc_opcode;
+	}
     return true;
 }
