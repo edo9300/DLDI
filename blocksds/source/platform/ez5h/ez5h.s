@@ -26,6 +26,11 @@
     bcc \label
 .endm
 
+.macro CALL_NO_INTERWORK fncreg
+    mov lr,pc
+    mov pc,\fncreg
+.endm
+
 @ returns in r2, doesn't touch other regs
 @ ez5h_sendCommand(u32 byteswapped_low, u32 non_byteswapped_high) -> u8
 BEGIN_ASM_FUNC ez5h_sendCommand
@@ -191,7 +196,8 @@ ez5h_sdhc_write_label:
 	ldr r7, ez5h_writeSector_sendCommand
 	@ sendCommand+0x28 = ez5h_writeSector_sendSDIOCommand
 	adds r7, 0x2A
-	bl write_trampoline
+	@ bl write_trampoline
+	CALL_NO_INTERWORK r7
 	cmp r0, #0
 	beq sdio_fail_write
 
@@ -200,7 +206,8 @@ ez5h_sdhc_write_label:
 	movs r6, r0
 	@ subs r7, 0x28
 	ldr r7, ez5h_writeSector_sendCommand
-	bl write_trampoline
+	@ bl write_trampoline
+	CALL_NO_INTERWORK r7
 	@ bl ez5h_sendCommand
 
 	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
@@ -210,8 +217,7 @@ ez5h_sdhc_write_label:
 	@ bl ez5h_sendWriteDataRomCommandShort
 	ldr r7, ez5h_writeSector_sendWriteDataRomCommand
 	adds r4, r7, #4
-    mov lr,pc
-    mov pc,r4
+	CALL_NO_INTERWORK r4
 	@ bl write_trampoline
 
 	@ load buffer addr that was pushed at the start
@@ -219,8 +225,7 @@ ez5h_sdhc_write_label:
 	@ and return the buffer address in r0
 	@ bl ez5h_sdio4BitCrc16
 	ldr r4, ez5h_writeSector_sdio4BitCrc16
-    mov lr,pc
-    mov pc,r4
+	CALL_NO_INTERWORK r4
 	@ ldr r7, ez5h_writeSector_sdio4BitCrc16
 	@ bl write_trampoline
 
@@ -231,7 +236,8 @@ ez5h_sdhc_write_label:
 	movs r3, #0xFF
 1:
 	@ bl ez5h_sendWriteDataRomCommand
-	bl write_trampoline
+	@ bl write_trampoline
+	CALL_NO_INTERWORK r7
 	@ do 0x100 iterations
 	subs r3, #1
 	bge 1b
@@ -242,7 +248,8 @@ ez5h_sdhc_write_label:
 	movs r3, #4
 1:
 	@ bl ez5h_sendWriteDataRomCommand
-	bl write_trampoline
+	@ bl write_trampoline
+	CALL_NO_INTERWORK r7
 	subs r3, #1
 	bne 1b
 
@@ -253,7 +260,8 @@ ez5h_sdhc_write_label:
 	movs r0, r5
 1:
 	@ bl ez5h_sendCommand
-	bl write_trampoline
+	@ bl write_trampoline
+	CALL_NO_INTERWORK r7
 	lsrs r2, #1
 	bcs 1b
 
@@ -265,7 +273,8 @@ ez5h_sdhc_write_label:
 	@ wait crc status acknowledged
 1:
 	@ bl ez5h_sendCommand
-	bl write_trampoline
+	@ bl write_trampoline
+	CALL_NO_INTERWORK r7
 	lsrs r2, #1
 	bcc 1b
 
@@ -275,15 +284,16 @@ ez5h_sdhc_write_label:
 	movs r4, #0xFF
 1:
 	@ bl ez5h_sendCommand
-	bl write_trampoline
+	@ bl write_trampoline
+	CALL_NO_INTERWORK r7
 	tst r2, r4
 	bne 1b
 
 sdio_fail_write:
 	@ r0 either is 0 or is EZ5H_CMD_SDMC_SEND_CLK(1) (thus nonzero)
 	pop	{r1-r2,r4-r7,pc}
-write_trampoline:
-	bx r7
+@ write_trampoline:
+	@ bx r7
 .pool
 
 .global ez5h_writeSector_sendCommand
