@@ -391,42 +391,46 @@ send_writedata_data:
 	.word 0xF6B8
 	.word REG_MCCNT0
 
-BEGIN_ASM_FUNC doOperation
-	push	{r3, r4, r5, r6, r7, lr}
-	movs	r4, r0
-	movs	r5, r2
-	movs	r7, r3
-	adds	r6, r0, r1
-label0:
-	cmp	r4, r6
-	bne	label2
-	movs	r0, #0x1
-label1:
-	pop	{r3, r4, r5, r6, r7}
-	pop	{r1}
-	bx	r1
-label2:
-	movs	r1, r5
-	movs	r0, r4
-	bl	trampoline
-	cmp	r0, #0x0
-	beq	label1
+@ bool doOperation(uint32_t sector, uint32_t num_sectors, void* buffer, bool(*operation)(u32 sector, void* buffer))
+BEGIN_ASM_FUNC doSDOperation
+	push {r3-r7, lr}
+	movs r4, r0
+	movs r5, r2
+	movs r7, r3
+	adds r6, r0, r1
 
-	movs	r3, #0x80
-	lsls	r3, r3, #0x2
-	adds	r4, #0x1
-	adds	r5, r5, r3
-	b	label0
-trampoline:
+check_next_sector:
+	cmp r4, r6
+	bne parse_next_sector
+
+	movs r0, #0x1
+sderror:
+	pop {r3-r7,pc}
+
+parse_next_sector:
+	movs r1, r5
+	movs r0, r4
+	bl call_sd_function
+	cmp r0, #0x0
+	beq sderror
+
+	movs r3, #0x80
+	lsls r3, #0x2
+	adds r5, r3
+	adds r4, #0x1
+	b check_next_sector
+
+call_sd_function:
 	bx	r7
 
 BEGIN_ASM_FUNC_NO_SECTION EZ5H_ReadSectors
 	ldr	r3, readSector_addr
-	b doOperation
+	b doSDOperation
 
 BEGIN_ASM_FUNC_NO_SECTION EZ5H_WriteSectors
 	ldr	r3, writeSector_addr
-	b doOperation
+	b doSDOperation
+
 .balign 4
 .global readSector_addr
 readSector_addr:
