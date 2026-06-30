@@ -247,13 +247,13 @@ ez5h_sdhc_write_label:
 	@ write the crc
 	@ r0 gets automatically incremented in ez5h_sendWriteDataRomCommand
 	mov r0, sp
-	movs r3, #4
+	movs r3, #3
 1:
 	@ bl ez5h_sendWriteDataRomCommand
 	@ bl write_trampoline
 	CALL_NO_INTERWORK r7
 	subs r3, #1
-	bne 1b
+	bge 1b
 
 	ldr r7, ez5h_writeSector_sendCommand
 	@ wait crc status start acknowledgment
