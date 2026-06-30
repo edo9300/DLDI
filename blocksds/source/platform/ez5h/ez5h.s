@@ -393,12 +393,12 @@ send_writedata_data:
 
 @ez5h_writeMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
 BEGIN_ASM_FUNC ez5h_writeMultipleSector
-	ldr	r3, writeSector_addr
+	ldr	r3, ez5h_writeSector_addr
 	b doSDOperation
 
 @ez5h_readMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
 BEGIN_ASM_FUNC_NO_SECTION ez5h_readMultipleSector
-	ldr	r3, readSector_addr
+	ldr	r3, ez5h_readSector_addr
 
 @ bool doOperation(uint32_t sector, uint32_t num_sectors, void* buffer, bool(*operation)(u32 sector, void* buffer))
 doSDOperation:
