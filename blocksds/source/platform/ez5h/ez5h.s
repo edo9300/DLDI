@@ -267,10 +267,6 @@ byteSwap32:
 BEGIN_ASM_FUNC EZ5H_SDWriteSector
 	push	{r0, r1, r4, r5, r6, r7, lr}
 	movs	r5, r0
-	movs	r0, r1
-	movs	r4, r1
-	@ mov r1,sp
-	@ bl	sccmn_sdio4BitCrc16
 
 sdhc_write_label:
 	lsls	r1, r5, #9
@@ -291,19 +287,19 @@ sdhc_write_label:
 
 	bl	cardExt_RomSendWriteDataShort
 
-	@ r0 gets automatically incremented in cardExt_RomSendWriteData
-	movs r0, r4
+	@ load buffer that was pushed at the start
+	ldr r0, [sp,#4]
+	mov r1, sp
+	bl	sccmn_sdio4BitCrc16
+
+	@ r0 is the data buffer left untouched by the above function call
+	@ and it gets automatically incremented in cardExt_RomSendWriteData
 	movs r4, #0x80
 	lsls r4, #2
 write_data_loop:
 	bl	cardExt_RomSendWriteData
 	subs r4, #2
 	bne	write_data_loop
-
-	@ load buffer that was pushed at the start
-	ldr r0, [sp,#4]
-	mov r1, sp
-	bl	sccmn_sdio4BitCrc16
 
 	@ r0 gets automatically incremented in cardExt_RomSendWriteData
 	mov	r0, sp
