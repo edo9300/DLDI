@@ -391,8 +391,17 @@ send_writedata_data:
 	.word 0xF6B8
 	.word REG_MCCNT0
 
+@ez5h_writeMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
+BEGIN_ASM_FUNC ez5h_writeMultipleSector
+	ldr	r3, writeSector_addr
+	b doSDOperation
+
+@ez5h_readMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
+BEGIN_ASM_FUNC_NO_SECTION ez5h_readMultipleSector
+	ldr	r3, readSector_addr
+
 @ bool doOperation(uint32_t sector, uint32_t num_sectors, void* buffer, bool(*operation)(u32 sector, void* buffer))
-BEGIN_ASM_FUNC doSDOperation
+doSDOperation:
 	push {r3-r7, lr}
 	movs r4, r0
 	movs r5, r2
@@ -423,18 +432,10 @@ parse_next_sector:
 call_sd_function:
 	bx	r7
 
-BEGIN_ASM_FUNC_NO_SECTION EZ5H_ReadSectors
-	ldr	r3, readSector_addr
-	b doSDOperation
-
-BEGIN_ASM_FUNC_NO_SECTION EZ5H_WriteSectors
-	ldr	r3, writeSector_addr
-	b doSDOperation
-
 .balign 4
-.global readSector_addr
-readSector_addr:
-.word 0
-.global writeSector_addr
-writeSector_addr:
-.word 0
+.global ez5h_readSector_addr
+ez5h_readSector_addr:
+	.word 0
+.global ez5h_writeSector_addr
+ez5h_writeSector_addr:
+	.word 0
