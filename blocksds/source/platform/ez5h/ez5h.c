@@ -90,12 +90,16 @@ static bool EZ5H_SDSendSDIOCommand(u8 cmd, u32 parameter, u8* buffer, int size) 
 
 extern uint32_t ez5h_readSector_addr;
 extern uint32_t ez5h_writeSector_addr;
+extern uint32_t read_ez5h_sendSDIOCommand_label;
 extern uint16_t ez5h_sdhc_read_label;
 extern uint16_t ez5h_sdhc_write_label;
+
+void ez5h_sendSDIOCommand();
 
 bool EZ5H_SDInitialize(void) {
 	ez5h_readSector_addr = (unsigned)&ez5h_readSector;
 	ez5h_writeSector_addr = (unsigned)&ez5h_writeSector;
+	read_ez5h_sendSDIOCommand_label = (unsigned)&ez5h_sendSDIOCommand;
     u8 response[17] = {};
     register bool isSD20 = false;
 
