@@ -187,16 +187,19 @@ ez5h_sdhc_write_label:
 	lsls r1, r0, #9
 
 	movs r0, #0x58
-	ldr r7, ez5h_writeSector_sendSDIOCommand
-	bl write_trampoline	
+	ldr r7, ez5h_writeSector_sendCommand
+	@ sendCommand+0x28 = ez5h_writeSector_sendSDIOCommand
+	adds r7, 0x28
+	bl write_trampoline
 	cmp r0, #0
 	beq sdio_fail_write
 
 	@ ez5h_sendSDIOCommand returned us EZ5H_CMD_SDMC_SEND_CLK(1) in r0-r1
 	@ save low word of command
 	movs r6, r0
+	@ subs r7, 0x28
 	ldr r7, ez5h_writeSector_sendCommand
-	bl write_trampoline	
+	bl write_trampoline
 	@ bl ez5h_sendCommand
 
 	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
@@ -204,8 +207,9 @@ ez5h_sdhc_write_label:
 	lsrs r5, r1, #16
 
 	@ bl ez5h_sendWriteDataRomCommandShort
-	ldr r7, ez5h_writeSector_sendWriteDataRomCommandShort
-	bl write_trampoline	
+	ldr r7, ez5h_writeSector_sendWriteDataRomCommand
+	adds r7, #4
+	bl write_trampoline
 
 	@ load buffer addr that was pushed at the start
 	ldr r0, [sp,#4]
@@ -217,10 +221,10 @@ ez5h_sdhc_write_label:
 	@ write the data
 	@ r0 is the data buffer left untouched by the above function call
 	@ and it gets automatically incremented in ez5h_sendWriteDataRomCommand
+	ldr r7, ez5h_writeSector_sendWriteDataRomCommand
 	movs r4, #0xFF
 1:
 	@ bl ez5h_sendWriteDataRomCommand
-	ldr r7, ez5h_writeSector_sendWriteDataRomCommand
 	bl write_trampoline
 	@ do 0x100 iterations
 	subs r4, #1
@@ -232,11 +236,11 @@ ez5h_sdhc_write_label:
 	movs r4, #4
 1:
 	@ bl ez5h_sendWriteDataRomCommand
-	ldr r7, ez5h_writeSector_sendWriteDataRomCommand
 	bl write_trampoline
 	subs r4, #1
 	bne 1b
 
+	ldr r7, ez5h_writeSector_sendCommand
 	@ wait crc status start acknowledgment
 	@ load EZ5H_CMD_SDMC_SEND_CRC_STATUS
 	movs r1, #0
@@ -248,13 +252,11 @@ ez5h_sdhc_write_label:
 
 	@ send single crc read clock
 	@ bl ez5h_sendCommand
-	ldr r7, ez5h_writeSector_sendCommand
 	bl write_trampoline
 
 	@ wait crc status acknowledged
 1:
 	@ bl ez5h_sendCommand
-	ldr r7, ez5h_writeSector_sendCommand
 	bl write_trampoline
 	lsrs r2, #1
 	bcc 1b
@@ -265,7 +267,6 @@ ez5h_sdhc_write_label:
 	movs r4, #0xFF
 1:
 	@ bl ez5h_sendCommand
-	ldr r7, ez5h_writeSector_sendCommand
 	bl write_trampoline
 	tst r2, r4
 	bne 1b
@@ -277,17 +278,11 @@ write_trampoline:
 	bx r7
 .pool
 
-.global ez5h_writeSector_sendSDIOCommand
 .global ez5h_writeSector_sendCommand
-.global ez5h_writeSector_sendWriteDataRomCommandShort
 .global ez5h_writeSector_sendWriteDataRomCommand
 .global ez5h_writeSector_sdio4BitCrc16
 
-ez5h_writeSector_sendSDIOCommand:
-	.word 0
 ez5h_writeSector_sendCommand:
-	.word 0
-ez5h_writeSector_sendWriteDataRomCommandShort:
 	.word 0
 ez5h_writeSector_sendWriteDataRomCommand:
 	.word 0
