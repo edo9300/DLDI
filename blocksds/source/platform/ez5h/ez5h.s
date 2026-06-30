@@ -222,22 +222,22 @@ ez5h_sdhc_write_label:
 	@ r0 is the data buffer left untouched by the above function call
 	@ and it gets automatically incremented in ez5h_sendWriteDataRomCommand
 	ldr r7, ez5h_writeSector_sendWriteDataRomCommand
-	movs r4, #0xFF
+	movs r3, #0xFF
 1:
 	@ bl ez5h_sendWriteDataRomCommand
 	bl write_trampoline
 	@ do 0x100 iterations
-	subs r4, #1
+	subs r3, #1
 	bge 1b
 
 	@ write the crc
 	@ r0 gets automatically incremented in ez5h_sendWriteDataRomCommand
 	mov r0, sp
-	movs r4, #4
+	movs r3, #4
 1:
 	@ bl ez5h_sendWriteDataRomCommand
 	bl write_trampoline
-	subs r4, #1
+	subs r3, #1
 	bne 1b
 
 	ldr r7, ez5h_writeSector_sendCommand
@@ -253,7 +253,8 @@ ez5h_sdhc_write_label:
 
 	@ send single crc read clock
 	@ bl ez5h_sendCommand
-	bl write_trampoline
+	@ ===============================MAYBE BREAK====================
+	@ bl write_trampoline
 
 	@ wait crc status acknowledged
 1:
@@ -391,7 +392,7 @@ BEGIN_ASM_FUNC ez5h_sendWriteDataRomCommand
 	ldrh r1, [r0]
 	adds r0, #2
 BEGIN_ASM_FUNC_NO_SECTION ez5h_sendWriteDataRomCommandShort
-	push {r0,lr}
+	push {r0,r3,lr}
 	adr r0,send_writedata_data
 	@ r0 holds EZ5H_CTRL_READ_0
 	@ r2 holds the lower word of EZ5H_CMD_SDMC_WRITE_DATA 0xF6B8
@@ -425,7 +426,7 @@ BEGIN_ASM_FUNC_NO_SECTION ez5h_sendWriteDataRomCommandShort
 	@ check if bit 31 is set (busy flag)
 	cmp r2, #0
 	blt 1b
-	pop {r0,pc}
+	pop {r0,r3,pc}
 
 .balign 4
 send_writedata_data:
