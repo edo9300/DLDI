@@ -286,8 +286,8 @@ sdhc_write_label:
 	bl	EZ5H_SendCommand3
 
 	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
-	ldr	r0, =0xF8B8F0FF
-	lsrs r5, r0, #16
+	ldr	r1, =0xF8B8F0FF
+	lsrs r5, r1, #16
 
 	bl	cardExt_RomSendWriteDataShort
 
@@ -351,34 +351,35 @@ sdio_fail_write:
 
 @cardExt_RomSendWriteData(const u8* datab)
 BEGIN_ASM_FUNC cardExt_RomSendWriteData
-	ldrh r0, [r0]
+	ldrh r1, [r0]
 BEGIN_ASM_FUNC_NO_SECTION cardExt_RomSendWriteDataShort
-	adr r1,send_writedata_data
-	@ r1 holds EZ5H_CTRL_READ_0
+	push {r0,lr}
+	adr r0,send_writedata_data
+	@ r0 holds EZ5H_CTRL_READ_0
 	@ r2 holds the lower word of EZ5H_CMD_SDMC_WRITE_DATA 0xF6B8
 	@ r3 holds REG_MCCNT0
-	ldmia r1, {r1-r3}
+	ldmia r0, {r0,r2-r3}
 
 	@ REG_MCCNT0 + 8 = REG_MCCMD0, so offset all the next writes
 	strh r2, [r3, #0+8]
 
-	strb r0, [r3, #3+8]
+	strb r1, [r3, #3+8]
 
-	lsrs r0, #4
-	strb r0, [r3, #2+8]
+	lsrs r1, #4
+	strb r1, [r3, #2+8]
 
-	lsrs r0, #4
-	strb r0, [r3, #5+8]
+	lsrs r1, #4
+	strb r1, [r3, #5+8]
 
-	lsrs r0, #4
-	strb r0, [r3, #4+8]
+	lsrs r1, #4
+	strb r1, [r3, #4+8]
 	
 	@ REG_MCCNT0 is 0x040001A0, << 10 = 0xXXXX8000
-	lsls r0, r3, #10
-	strh r0, [r3]
+	lsls r1, r3, #10
+	strh r1, [r3]
 
 	@ REG_MCCNT0 + 4 = REG_MCCNT1
-	str r1, [r3, #4]
+	str r0, [r3, #4]
 
 	@ check for busy
 1:
@@ -386,7 +387,7 @@ BEGIN_ASM_FUNC_NO_SECTION cardExt_RomSendWriteDataShort
 	@ check if bit 31 is set (busy flag)
 	cmp r2, #0
 	blt 1b
-	bx lr
+	pop {r0,pc}
 
 .balign 4
 send_writedata_data:
