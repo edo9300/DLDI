@@ -58,5 +58,5 @@ static inline u64 EZ5H_CMD_SDMC_WRITE_DATA(const u8* data) {
 
 u32 EZ5H_SRAMReadData(u32 address);
 bool EZ5H_SDInitialize(void);
-bool EZ5H_SDReadSector(u32 sector, void* buffer);
-bool EZ5H_SDWriteSector(u32 sector, const u8* buffer);
+bool ez5h_readSector(u32 sector, void* buffer);
+bool ez5h_writeSector(u32 sector, const u8* buffer);

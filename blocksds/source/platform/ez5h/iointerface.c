@@ -29,7 +29,7 @@ bool EZ5H_ClearStatus(void) {
 // success.
 bool EZ5H_ReadSectors(uint32_t sector, uint32_t num_sectors, void* buffer) {
     for (int i = 0; i < num_sectors; i++) {
-        bool result = EZ5H_SDReadSector(sector, buffer);
+        bool result = ez5h_readSector(sector, buffer);
         if (!result) return false;
         sector++;
         buffer = (u8*)buffer + 0x200;
@@ -41,7 +41,7 @@ bool EZ5H_ReadSectors(uint32_t sector, uint32_t num_sectors, void* buffer) {
 // success.
 bool EZ5H_WriteSectors(uint32_t sector, uint32_t num_sectors, const void* buffer) {
     for (int i = 0; i < num_sectors; i++) {
-        bool result = EZ5H_SDWriteSector(sector, buffer);
+        bool result = ez5h_writeSector(sector, buffer);
         if (!result) return false;
         sector++;
         buffer = (u8*)buffer + 0x200;

@@ -26,8 +26,89 @@
     bcc \label
 .endm
 
-@ bool EZ5H_SDReadSector(u32 sector, void* buffer)
-BEGIN_ASM_FUNC EZ5H_SDReadSector
+@ returns in r2, doesn't touch other regs
+@ ez5h_sendCommand(u32 byteswapped_low, u32 non_byteswapped_high) -> u8
+BEGIN_ASM_FUNC ez5h_sendCommand
+	push {r1,r3-r5,lr}
+	
+	adr r2, ez5h_sendCommand_data
+	@ r3 holds REG_MCCMD0
+	@ r4 holds EZ5H_CTRL_READ_4B
+	@ r5 holds REG_MCD1
+	ldmia r2!, {r3,r4,r5}
+
+	@ write card command, r0 is already byteswapped, r1 no
+	stmia r3!, {r0}
+	strb r1, [r3, #3]
+	lsrs r1, #8
+	strb r1, [r3, #2]
+	lsrs r1, #8
+	strb r1, [r3, #1]
+	lsrs r1, #8
+	strb r1, [r3, #0]
+	@ REG_MCCMD0 is incremented by 8 in the stmia, REG_MCCMD0-8 = REG_MCCNT0
+	subs r3, #12
+	@ REG_MCCNT0 is 0x040001A0, << 10 = 0xXXXX8000
+	lsls r2, r3, #10
+	strh r2, [r3]
+
+	@ REG_MCCNT0 + 4 = REG_MCCNT1
+	@ write EZ5H_CTRL_READ_4B to mccnt1
+	str r4, [r3, #4]	
+
+1:
+	CHECK_DATA_READY r1,r3,#4,1b
+
+	@ read from REG_MCD1
+	ldr r2, [r5]
+	pop {r1,r3-r5,pc}
+
+@ ez5h_sendSDIOCommand(u8 command, u32 parameter)
+@ returns either 0 or EZ5H_CMD_SDMC_SEND_CLK(1) (r0-r1)
+BEGIN_ASM_FUNC_NO_SECTION ez5h_sendSDIOCommand
+	push {r4-r7,lr}
+	lsls r2, r0, #24
+	@ fixed part of the EZ5H_CMD_SDMC_SDIO command
+	ldr r7, =0x0000FAB8
+	@ this is equivalent to an OR, since the values don't overlap, but we need an ADD instruction to use 3 regs
+	adds r0, r7, r2
+	@ r1 is passed as is, not byteswapped, while r0 is constructed already byteswapped
+	bl ez5h_sendCommand
+	@ load 0x10000
+	movs r4, #1
+	lsls r4, #16
+	@ r7 holds 0x0000FAB8
+	@ this gives us the byteswapped card command equivalent to EZ5H_CMD_SDMC_PARAM_CARD(1, 0, 0), which is EZ5H_CMD_SDMC_SEND_CLK(1)
+	@ with r0 being 0x0001FAB8 and r1 being 0x00000000
+	adds r0, r4, r7
+	@ lower part of the card command
+	movs r1, #0
+
+	movs r5, #0xFF
+wait_for_start_marker:
+	@ ez5h_sendCommand leaves r0-r1 intact and returns in r2
+	bl ez5h_sendCommand
+	tst r2, r5
+	bne start_marker_not_received
+	@ r0 is already non-0
+	@ movs r0, #1
+	b end
+start_marker_not_received:
+	subs r4, #1
+	bne wait_for_start_marker
+
+	movs r0, #0
+end:
+	pop {r4-r7,pc}
+
+.balign 4
+ez5h_sendCommand_data:
+	.word   REG_MCCMD0
+	.word   EZ5H_CTRL_READ_4B
+	.word   REG_MCD1
+
+@ bool ez5h_readSector(u32 sector, void* buffer)
+BEGIN_ASM_FUNC ez5h_readSector
 	push {r4-r7,lr}
 	movs r6,r1
 
@@ -35,7 +116,7 @@ sdhc_read_label:
 	lsls r1,r0,#9
 
 	movs r0,#0x51
-	bl EZ5H_SDSendSDIOCommand2
+	bl ez5h_sendSDIOCommand
 	cmp r0,#0
 	beq sdio_fail
 
@@ -89,86 +170,85 @@ read_sector_data:
 	.word EZ5H_CTRL_READ_512
 	.word REG_MCD1
 
-@ returns in r2, doesn't touch other regs
-@ EZ5H_SendCommand(u32 byteswapped_low, u32 non_byteswapped_high) -> u8
-BEGIN_ASM_FUNC EZ5H_SendCommand3
-	push {r1,r3-r5,lr}
-	
-	adr r2, EZ5H_SendCommand_data
-	@ r3 holds REG_MCCMD0
-	@ r4 holds EZ5H_CTRL_READ_4B
-	@ r5 holds REG_MCD1
-	ldmia r2!, {r3,r4,r5}
+@ bool ez5h_writeSector(u32 sector, void* buffer)
+BEGIN_ASM_FUNC ez5h_writeSector
+	push {r0-r1,r4-r6,lr}
 
-	@ write card command, r0 is already byteswapped, r1 no
-	stmia r3!, {r0}
-	strb r1, [r3, #3]
-	lsrs r1, #8
-	strb r1, [r3, #2]
-	lsrs r1, #8
-	strb r1, [r3, #1]
-	lsrs r1, #8
-	strb r1, [r3, #0]
-	@ REG_MCCMD0 is incremented by 8 in the stmia, REG_MCCMD0-8 = REG_MCCNT0
-	subs r3, #12
-	@ REG_MCCNT0 is 0x040001A0, << 10 = 0xXXXX8000
-	lsls r2, r3, #10
-	strh r2, [r3]
+sdhc_write_label:
+	lsls r1, r0, #9
 
-	@ REG_MCCNT0 + 4 = REG_MCCNT1
-	@ write EZ5H_CTRL_READ_4B to mccnt1
-	str r4, [r3, #4]	
+	movs r0, #0x58
+	bl ez5h_sendSDIOCommand
+	cmp r0, #0
+	beq sdio_fail_write
 
+	@ ez5h_sendSDIOCommand returned us EZ5H_CMD_SDMC_SEND_CLK(1) in r0-r1
+	@ save low word of command
+	movs r6, r0
+	bl ez5h_sendCommand
+
+	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
+	ldr r1, =0xF8B8F0FF
+	lsrs r5, r1, #16
+
+	bl ez5h_sendWriteDataRomCommandShort
+
+	@ load buffer addr that was pushed at the start
+	ldr r0, [sp,#4]
+	mov r1, sp
+	bl ez5h_sdio4BitCrc16
+
+	@ write the data
+	@ r0 is the data buffer left untouched by the above function call
+	@ and it gets automatically incremented in ez5h_sendWriteDataRomCommand
+	movs r4, #0xFF
 1:
-	CHECK_DATA_READY r1,r3,#4,1b
-
-	@ read from REG_MCD1
-	ldr r2, [r5]
-	pop {r1,r3-r5,pc}
-
-@ EZ5H_SDSendSDIOCommand2(u8 command, u32 parameter)
-@ returns either 0 or EZ5H_CMD_SDMC_SEND_CLK(1) (r0-r1)
-BEGIN_ASM_FUNC_NO_SECTION EZ5H_SDSendSDIOCommand2
-	push {r4-r7,lr}
-	lsls r2, r0, #24
-	@ fixed part of the EZ5H_CMD_SDMC_SDIO command
-	ldr r7, =0x0000FAB8
-	@ this is equivalent to an OR, since the values don't overlap, but we need an ADD instruction to use 3 regs
-	adds r0, r7, r2
-	@ r1 is passed as is, not byteswapped, while r0 is constructed already byteswapped
-	bl EZ5H_SendCommand3
-	@ load 0x10000
-	movs r4, #1
-	lsls r4, #16
-	@ r7 holds 0x0000FAB8
-	@ this gives us the byteswapped card command equivalent to EZ5H_CMD_SDMC_PARAM_CARD(1, 0, 0), which is EZ5H_CMD_SDMC_SEND_CLK(1)
-	@ with r0 being 0x0001FAB8 and r1 being 0x00000000
-	adds r0, r4, r7
-	@ lower part of the card command
-	movs r1, #0
-
-	movs r5, #0xFF
-wait_for_start_marker:
-	@ EZ5H_SendCommand3 leaves r0-r1 intact and returns in r2
-	bl EZ5H_SendCommand3
-	tst r2, r5
-	bne start_marker_not_received
-	@ r0 is already non-0
-	@ movs r0, #1
-	b end
-start_marker_not_received:
+	bl ez5h_sendWriteDataRomCommand
+	@ do 0x100 iterations
 	subs r4, #1
-	bne wait_for_start_marker
+	bge 1b
 
-	movs r0, #0
-end:
-	pop {r4-r7,pc}
+	@ write the crc
+	@ r0 gets automatically incremented in ez5h_sendWriteDataRomCommand
+	mov r0, sp
+	movs r4, #4
+1:
+	bl ez5h_sendWriteDataRomCommand
+	subs r4, #1
+	bne 1b
 
-.balign 4
-EZ5H_SendCommand_data:
-	.word   REG_MCCMD0
-	.word   EZ5H_CTRL_READ_4B
-	.word   REG_MCD1
+	@ wait crc status start acknowledgment
+	@ load EZ5H_CMD_SDMC_SEND_CRC_STATUS
+	movs r1, #0
+	movs r0, r5
+1:
+	bl ez5h_sendCommand
+	lsrs r2, #1
+	bcs 1b
+
+	@ send single crc read clock
+	bl ez5h_sendCommand
+
+	@ wait crc status acknowledged
+1:
+	bl ez5h_sendCommand
+	lsrs r2, #1
+	bcc 1b
+
+	@ wait for card to be ready again
+	@ load backed up EZ5H_CMD_SDMC_SEND_CLK(1), r1 is already setup as 0 from before
+	movs r0, r6
+	movs r4, #0xFF
+1:
+	bl ez5h_sendCommand
+	tst r2, r4
+	bne 1b
+
+sdio_fail_write:
+	@ r0 either is 0 or is EZ5H_CMD_SDMC_SEND_CLK(1) (thus nonzero)
+	pop	{r1-r2,r4-r6,pc}
+.pool
+
 
 @ static uint64_t inline calSingleCRC16(uint64_t crc, uint32_t data_in){
 @ 	// Shift out 8 bits for each line
@@ -205,7 +285,7 @@ EZ5H_SendCommand_data:
 
 @ void sdio_crc16_4bit_checksum(void*, uint64_t* out)
 @ no reg is touched
-BEGIN_ASM_FUNC sccmn_sdio4BitCrc16
+BEGIN_ASM_FUNC ez5h_sdio4BitCrc16
 	@ push {r5}
     push {r0,r2,r3,r4-r5,r6,lr}
     movs r4, #0 @ r4 = crc_lo
@@ -262,86 +342,11 @@ byteSwap32:
 
 .pool
 
-
-@ bool EZ5H_SDWriteSector(u32 sector, void* buffer)
-BEGIN_ASM_FUNC EZ5H_SDWriteSector
-	push	{r0, r1, r4-r6, lr}
-
-sdhc_write_label:
-	lsls r1, r0, #9
-
-	movs r0, #0x58
-	bl	EZ5H_SDSendSDIOCommand2
-	cmp	r0, #0
-	beq	sdio_fail_write
-
-	@ EZ5H_SDSendSDIOCommand2 returned us EZ5H_CMD_SDMC_SEND_CLK(1) in r0-r1
-	@ save low word of command
-	movs r6, r0
-	bl	EZ5H_SendCommand3
-
-	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
-	ldr	r1, =0xF8B8F0FF
-	lsrs r5, r1, #16
-
-	bl	cardExt_RomSendWriteDataShort
-
-	@ load buffer addr that was pushed at the start
-	ldr r0, [sp,#4]
-	mov r1, sp
-	bl	sccmn_sdio4BitCrc16
-
-	@ r0 is the data buffer left untouched by the above function call
-	@ and it gets automatically incremented in cardExt_RomSendWriteData
-	movs r4, #0xFF
-write_data_loop:
-	bl	cardExt_RomSendWriteData
-	@ do 0x100 iterations
-	subs r4, #1
-	bge	write_data_loop
-
-	@ r0 gets automatically incremented in cardExt_RomSendWriteData
-	mov	r0, sp
-	movs r4, #4
-write_crc_loop:
-	bl	cardExt_RomSendWriteData
-	subs r4, #1
-	bne	write_crc_loop
-
-	@ load EZ5H_CMD_SDMC_SEND_CRC_STATUS
-	movs r1, #0
-	movs r0, r5
-crc_start_wait:
-	bl	EZ5H_SendCommand3
-	lsrs r2, #1
-	bcs	crc_start_wait
-
-	@ send single crc read clock
-	bl	EZ5H_SendCommand3
-crc_read_wait:
-	bl	EZ5H_SendCommand3
-	lsrs r2, #1
-	bcc crc_read_wait
-
-	@ load backed up EZ5H_CMD_SDMC_SEND_CLK(1), r1 is already setup as 0 from before
-	movs r0, r6
-	movs r4, #0xFF
-wait_card_ready:
-	bl	EZ5H_SendCommand3
-	tst	r2, r4
-	bne	wait_card_ready
-
-sdio_fail_write:
-	@ r0 either is 0 or is EZ5H_CMD_SDMC_SEND_CLK(1) (thus nonzero)
-	pop	{r1, r2, r4-r6, pc}
-.pool
-
-
-@cardExt_RomSendWriteData(const u8* datab)
-BEGIN_ASM_FUNC cardExt_RomSendWriteData
+@ez5h_sendWriteDataRomCommand(const u8* datab)
+BEGIN_ASM_FUNC ez5h_sendWriteDataRomCommand
 	ldrh r1, [r0]
 	adds r0, #2
-BEGIN_ASM_FUNC_NO_SECTION cardExt_RomSendWriteDataShort
+BEGIN_ASM_FUNC_NO_SECTION ez5h_sendWriteDataRomCommandShort
 	push {r0,lr}
 	adr r0,send_writedata_data
 	@ r0 holds EZ5H_CTRL_READ_0
