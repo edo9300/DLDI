@@ -304,27 +304,25 @@ write_crc_loop:
 	bl	cardExt_RomSendWriteData
 	subs r3, #2
 	bne	write_crc_loop
+	movs r4, #1
 
-	@ movs r4, #1
 	@ load EZ5H_CMD_SDMC_SEND_CRC_STATUS
-	movs r1, #0
+	movs	r1, #0
 	movs r0, r5
 crc_start_wait:
 	bl	EZ5H_SendCommand3
-	lsrs r2, #1
-	@ movs	r3, r2
-	@ ands	r3, r4
-	@ tst	r2, r4
-	bcs	crc_start_wait
+	movs	r3, r2
+	ands	r3, r4
+	tst	r2, r4
+	bne	crc_start_wait
 
 	bl	EZ5H_SendCommand3
-	@ movs	r4, #1
+	movs	r4, #1
 
 crc_read_wait:
 	bl	EZ5H_SendCommand3
-	lsrs r2, #1
-	@ tst	r2, r4
-	bcc crc_read_wait
+	tst	r2, r4
+	beq	crc_read_wait
 
 	movs	r4, #0xFF
 	@ pop {r0,r1}
