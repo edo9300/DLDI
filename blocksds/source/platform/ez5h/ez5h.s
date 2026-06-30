@@ -66,7 +66,7 @@ BEGIN_ASM_FUNC ez5h_sendCommand
 @ ez5h_sendSDIOCommand(u8 command, u32 parameter)
 @ returns either 0 or EZ5H_CMD_SDMC_SEND_CLK(1) (r0-r1)
 BEGIN_ASM_FUNC_NO_SECTION ez5h_sendSDIOCommand
-	push {r4-r7,lr}
+	push {r2-r7,lr}
 	lsls r2, r0, #24
 	@ fixed part of the EZ5H_CMD_SDMC_SDIO command
 	ldr r7, =0x0000FAB8
@@ -99,7 +99,7 @@ start_marker_not_received:
 
 	movs r0, #0
 end:
-	pop {r4-r7,pc}
+	pop {r2-r7,pc}
 
 .balign 4
 ez5h_sendCommand_data:
@@ -121,17 +121,17 @@ ez5h_sdhc_read_label:
 	cmp r0,#0
 	beq sdio_fail
 
-	adr r1,read_sector_data
-	@ r1 holds the lower word of EZ5H_CMD_SDMC_READ_DATA
+	adr r2,read_sector_data
+	@ r2 holds the lower word of EZ5H_CMD_SDMC_READ_DATA
 	@ r3 holds REG_MCCMD0
 	@ r4 holds EZ5H_CTRL_READ_512
 	@ r5 holds REG_MCD1
-	ldmia r1, {r1,r3,r4,r5}
+	ldmia r2, {r2,r3,r4,r5}
 
 	@ lower word of EZ5H_CMD_SDMC_READ_DATA
-	movs r2, #0
+	movs r7, #0
 
-	stmia r3!, {r1, r2}
+	stmia r3!, {r2, r7}
 	@ REG_MCCMD0 is incremented by 8 in the stmia, REG_MCCMD0-8 = REG_MCCNT0
 	subs r3, #16
 
