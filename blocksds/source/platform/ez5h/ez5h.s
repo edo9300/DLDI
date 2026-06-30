@@ -246,7 +246,8 @@ ez5h_sdhc_write_label:
 	movs r1, #0
 	movs r0, r5
 1:
-	bl ez5h_sendCommand
+	@ bl ez5h_sendCommand
+	bl write_trampoline
 	lsrs r2, #1
 	bcs 1b
 
