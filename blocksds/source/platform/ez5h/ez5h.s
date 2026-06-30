@@ -170,79 +170,176 @@ EZ5H_SendCommand_data:
 	.word   EZ5H_CTRL_READ_4B
 	.word   REG_MCD1
 
+@ static uint64_t inline calSingleCRC16(uint64_t crc, uint32_t data_in){
+@ 	// Shift out 8 bits for each line
+@ 	uint32_t data_out = crc >> 32;
+@ 	crc <<= 32;
+@
+@ 	// XOR outgoing data to itself with 4 bit delay
+@ 	data_out ^= (data_out >> 16);
+@
+@ 	// XOR incoming data to outgoing data with 4 bit delay
+@ 	data_out ^= (data_in >> 16);
+@
+@ 	// XOR outgoing and incoming data to accumulator at each tap
+@ 	uint64_t xorred = data_out ^ data_in;
+@ 	crc ^= xorred;
+@ 	crc ^= xorred << (5 * 4);
+@ 	crc ^= xorred << (12 * 4);
+@ 	return crc;
+@ }
+@ void sdio_crc16_4bit_checksum(void* dataBuf, uint64_t* out)
+@ {
+@ 	uint32_t num_words = 512 / sizeof(uint32_t);
+@ 	uint64_t crc = 0;
+@     auto* data = static_cast<uint32_t*>(dataBuf);
+@     auto* end = data + num_words;
+@     while (data < end)
+@     {
+@         uint32_t data_in = __builtin_bswap32(*data++);
+@         crc = calSingleCRC16(crc, data_in);
+@     }
+@
+@ 	*out = __builtin_bswap64(crc);
+@ }
+
+@ void sdio_crc16_4bit_checksum(void*, uint64_t* out)
+@ no reg is touched
+BEGIN_ASM_FUNC sccmn_sdio4BitCrc16
+	@ push {r5}
+    push {r0,r2,r3,r4-r5,r6,lr}
+    movs r4, #0 @ r4 = crc_lo
+    movs r5, #0 @ r5 = crc_hi
+    movs r6, #128
+1:
+    @ r5 = data_out
+    lsrs r3, r5, #16
+    eors r5, r3
+
+    ldmia r0!, {r2}
+
+    bl byteSwap32
+    @ r2 = data_in
+
+    lsrs r3, r2, #16
+    eors r5, r3
+    eors r2, r5 // r2 = xorred
+    movs r5, r4 // r5 = crc_hi
+    movs r4, r2 // r4 = crc_lo
+
+    lsls r3, r2, #20
+    eors r4, r3
+    lsrs r3, r2, #12
+    eors r5, r3
+    lsls r3, r2, #16
+    eors r5, r3
+
+    subs r6, #1
+    bne 1b
+
+    movs r2, r4
+    bl byteSwap32
+	str r2, [r1,#4]
+
+    movs r2, r5
+    bl byteSwap32
+	str r2, [r1]
+    pop {r0,r2,r3,r4-r5,r6,pc}
+
+byteSwap32:
+    push {r4-r5,lr}
+    movs r5, #16
+    ldr r4, =0xFF00FF
+    rors r2, r5 // ror 16
+    ands r4, r2
+    bics r2, r4
+    lsls r4, r4, #8
+    lsrs r2, r2, #8
+    orrs r2, r4
+    pop {r4-r5,pc}
+
+.balign 4
+
+.pool
+
+
 @ bool EZ5H_SDWriteSector(u32 sector, void* buffer)
 BEGIN_ASM_FUNC EZ5H_SDWriteSector
 	push	{r0, r1, r4, r5, r6, r7, lr}
 	movs	r5, r0
 	movs	r0, r1
 	movs	r4, r1
-	bl	sdio_crc16_4bit_checksum
-	str	r0, [sp]
-	str	r1, [sp, #4]
+	mov r1,sp
+	bl	sccmn_sdio4BitCrc16
 
 sdhc_write_label:
 	lsls	r1, r5, #9
 
 	movs	r0, #0x58
 	bl	EZ5H_SDSendSDIOCommand2
-	subs	r5, r0, #0
-	beq	.L2
-	
+	cmp	r0, #0
+	beq	sdio_fail_write
+
 	@ EZ5H_SDSendSDIOCommand2 returned us EZ5H_CMD_SDMC_SEND_CLK(1) in r0-r1
-	@ movs	r1, #0
-	@ ldr	r0, .L17
-	@ push {r0,r1}
+	@ save low word of command
 	movs r7, r0
 	bl	EZ5H_SendCommand3
 
 	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
 	ldr	r0, =0xF8B8F0FF
 	lsrs r5, r0, #16
+
 	bl	cardExt_RomSendWriteDataShort
+
 	movs	r3, #0x80
 	lsls	r3, r3, #2
 	adds	r6, r4, r3
-.L3:
+write_data_loop:
 	movs	r0, r4
-	adds	r4, r4, #2
+	adds	r4, #2
 	bl	cardExt_RomSendWriteData
 	cmp	r4, r6
-	bne	.L3
+	bne	write_data_loop
+
 	movs	r4, #0
-.L4:
+write_crc_loop:
 	mov	r0, sp
-	adds	r0, r0, r4
-	adds	r4, r4, #2
+	adds	r0, r4
+	adds	r4, #2
 	bl	cardExt_RomSendWriteData
 	cmp	r4, #8
-	bne	.L4
+	bne	write_crc_loop
 	subs	r4, r4, #7
 
 	@ load EZ5H_CMD_SDMC_SEND_CRC_STATUS
 	movs	r1, #0
 	movs r0, r5
-.L5:
+crc_start_wait:
 	bl	EZ5H_SendCommand3
 	movs	r3, r2
 	ands	r3, r4
 	tst	r2, r4
-	bne	.L5
+	bne	crc_start_wait
+
 	bl	EZ5H_SendCommand3
 	movs	r4, #1
-.L6:
+
+crc_read_wait:
 	bl	EZ5H_SendCommand3
 	tst	r2, r4
-	beq	.L6
+	beq	crc_read_wait
+
 	movs	r4, #0xFF
 	@ pop {r0,r1}
-.L7:
+wait_card_ready:
 	@ ldr	r0, =0x0001FAB8
 	@ load backed up EZ5H_CMD_SDMC_SEND_CLK(1)
 	movs r0, r7
 	bl	EZ5H_SendCommand3
 	tst	r2, r4
-	bne	.L7
-.L2:
+	bne	wait_card_ready
+
+sdio_fail_write:
 	@ sp needed
 	@ r0 either is 0 or is EZ5H_CMD_SDMC_SEND_CLK(1) (thus nonzero)
 	@ movs r0, r5
