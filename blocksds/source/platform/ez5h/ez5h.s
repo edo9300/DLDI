@@ -269,8 +269,8 @@ BEGIN_ASM_FUNC EZ5H_SDWriteSector
 	movs	r5, r0
 	movs	r0, r1
 	movs	r4, r1
-	mov r1,sp
-	bl	sccmn_sdio4BitCrc16
+	@ mov r1,sp
+	@ bl	sccmn_sdio4BitCrc16
 
 sdhc_write_label:
 	lsls	r1, r5, #9
@@ -299,6 +299,11 @@ write_data_loop:
 	bl	cardExt_RomSendWriteData
 	subs r4, #2
 	bne	write_data_loop
+
+	@ load buffer that was pushed at the start
+	ldr r0, [sp,#4]
+	mov r1, sp
+	bl	sccmn_sdio4BitCrc16
 
 	@ r0 gets automatically incremented in cardExt_RomSendWriteData
 	mov	r0, sp
@@ -332,9 +337,7 @@ wait_card_ready:
 	bne	wait_card_ready
 
 sdio_fail_write:
-	@ sp needed
 	@ r0 either is 0 or is EZ5H_CMD_SDMC_SEND_CLK(1) (thus nonzero)
-	@ movs r0, r5
 	pop	{r1, r2, r4, r5, r6, r7, pc}
 .pool
 
