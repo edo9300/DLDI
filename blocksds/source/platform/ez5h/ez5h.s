@@ -323,11 +323,10 @@ crc_read_wait:
 	lsrs r2, #1
 	bcc crc_read_wait
 
-	movs	r4, #0xFF
-	@ pop {r0,r1}
-wait_card_ready:
-	@ load backed up EZ5H_CMD_SDMC_SEND_CLK(1)
+	@ load backed up EZ5H_CMD_SDMC_SEND_CLK(1), r1 is already setup as 0 from before
 	movs r0, r7
+	movs r4, #0xFF
+wait_card_ready:
 	bl	EZ5H_SendCommand3
 	tst	r2, r4
 	bne	wait_card_ready
@@ -336,9 +335,7 @@ sdio_fail_write:
 	@ sp needed
 	@ r0 either is 0 or is EZ5H_CMD_SDMC_SEND_CLK(1) (thus nonzero)
 	@ movs r0, r5
-	pop	{r1, r2, r4, r5, r6, r7}
-	pop	{r1}
-	bx	r1
+	pop	{r1, r2, r4, r5, r6, r7, pc}
 .pool
 
 
