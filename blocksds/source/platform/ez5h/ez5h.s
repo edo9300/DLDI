@@ -400,7 +400,7 @@ BEGIN_ASM_FUNC ez5h_sendWriteDataRomCommand
 	ldrh r1, [r0]
 	adds r0, #2
 BEGIN_ASM_FUNC_NO_SECTION ez5h_sendWriteDataRomCommandShort
-	push {r0,r3,lr}
+	push {r0,r3}
 	adr r0,send_writedata_data
 	@ r0 holds EZ5H_CTRL_READ_0
 	@ r2 holds the lower word of EZ5H_CMD_SDMC_WRITE_DATA 0xF6B8
@@ -435,8 +435,7 @@ BEGIN_ASM_FUNC_NO_SECTION ez5h_sendWriteDataRomCommandShort
 	cmp r2, #0
 	blt 1b
 	pop {r0,r3}
-	pop {r2}
-	mov pc, r2
+	mov pc, lr
 
 .balign 4
 send_writedata_data:
