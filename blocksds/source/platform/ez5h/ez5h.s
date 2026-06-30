@@ -208,20 +208,25 @@ ez5h_sdhc_write_label:
 
 	@ bl ez5h_sendWriteDataRomCommandShort
 	ldr r7, ez5h_writeSector_sendWriteDataRomCommand
-	adds r7, #4
-	bl write_trampoline
+	adds r4, r7, #4
+    mov lr,pc
+    mov pc,r4
+	@ bl write_trampoline
 
 	@ load buffer addr that was pushed at the start
 	@ sdio4BitCrc16 will get the arguments directly from the stack
 	@ and return the buffer address in r0
 	@ bl ez5h_sdio4BitCrc16
-	ldr r7, ez5h_writeSector_sdio4BitCrc16
-	bl write_trampoline
+	ldr r4, ez5h_writeSector_sdio4BitCrc16
+    mov lr,pc
+    mov pc,r4
+	@ ldr r7, ez5h_writeSector_sdio4BitCrc16
+	@ bl write_trampoline
 
 	@ write the data
 	@ r0 is the data buffer left untouched by the above function call
 	@ and it gets automatically incremented in ez5h_sendWriteDataRomCommand
-	ldr r7, ez5h_writeSector_sendWriteDataRomCommand
+	@ ldr r7, ez5h_writeSector_sendWriteDataRomCommand
 	movs r3, #0xFF
 1:
 	@ bl ez5h_sendWriteDataRomCommand
@@ -369,7 +374,9 @@ BEGIN_ASM_FUNC ez5h_sdio4BitCrc16
     movs r2, r5
     bl byteSwap32
 	str r2, [r1]
-    pop {r0,r2,r3,r4-r5,r6,pc}
+    pop {r0,r2,r3,r4-r5,r6}
+	pop {r1}
+    mov pc,r1
 
 byteSwap32:
     push {r4-r5,lr}
@@ -426,7 +433,9 @@ BEGIN_ASM_FUNC_NO_SECTION ez5h_sendWriteDataRomCommandShort
 	@ check if bit 31 is set (busy flag)
 	cmp r2, #0
 	blt 1b
-	pop {r0,r3,pc}
+	pop {r0,r3}
+	pop {r2}
+	mov pc, r2
 
 .balign 4
 send_writedata_data:
