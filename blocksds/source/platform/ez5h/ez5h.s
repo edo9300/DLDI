@@ -29,7 +29,7 @@
 @ returns in r2, doesn't touch other regs
 @ ez5h_sendCommand(u32 byteswapped_low, u32 non_byteswapped_high) -> u8
 BEGIN_ASM_FUNC ez5h_sendCommand
-	push {r1,r3-r5,lr}
+	push {r1,r3-r5}
 	
 	adr r2, ez5h_sendCommand_data
 	@ r3 holds REG_MCCMD0
@@ -61,7 +61,8 @@ BEGIN_ASM_FUNC ez5h_sendCommand
 
 	@ read from REG_MCD1
 	ldr r2, [r5]
-	pop {r1,r3-r5,pc}
+	pop {r1,r3-r5}
+	mov pc, lr
 
 @ ez5h_sendSDIOCommand(u8 command, u32 parameter)
 @ returns either 0 or EZ5H_CMD_SDMC_SEND_CLK(1) (r0-r1)
@@ -189,7 +190,7 @@ ez5h_sdhc_write_label:
 	movs r0, #0x58
 	ldr r7, ez5h_writeSector_sendCommand
 	@ sendCommand+0x28 = ez5h_writeSector_sendSDIOCommand
-	adds r7, 0x28
+	adds r7, 0x2A
 	bl write_trampoline
 	cmp r0, #0
 	beq sdio_fail_write
