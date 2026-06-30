@@ -72,7 +72,8 @@ BEGIN_ASM_FUNC ez5h_sendCommand
 @ ez5h_sendSDIOCommand(u8 command, u32 parameter)
 @ returns either 0 or EZ5H_CMD_SDMC_SEND_CLK(1) (r0-r1)
 BEGIN_ASM_FUNC_NO_SECTION ez5h_sendSDIOCommand
-	push {r2-r7,lr}
+	push {r2-r7}
+	mov r8, lr
 	lsls r2, r0, #24
 	@ fixed part of the EZ5H_CMD_SDMC_SDIO command
 	ldr r7, =0x0000FAB8
@@ -105,7 +106,8 @@ start_marker_not_received:
 
 	movs r0, #0
 end:
-	pop {r2-r7,pc}
+	pop {r2-r7}
+	mov pc, r8
 
 .balign 4
 ez5h_sendCommand_data:
@@ -453,16 +455,28 @@ send_writedata_data:
 	.word 0xF6B8
 	.word REG_MCCNT0
 
+.arm
 @ez5h_writeMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
 BEGIN_ASM_FUNC ez5h_writeMultipleSector
 	ldr	r3, ez5h_writeSector_addr
-	b doSDOperation
+	b save_regs_and_switch_to_thumb
 
 @ez5h_readMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
 BEGIN_ASM_FUNC_NO_SECTION ez5h_readMultipleSector
 	ldr	r3, ez5h_readSector_addr
+save_regs_and_switch_to_thumb:
+	push {r4-r12,lr}
+	adr r4, doSDOperation
+	orr r4, #1
+	bl trampoline
+	pop {r4-r12,lr}
+	bx lr
+trampoline:
+	bx r4
 
+.thumb
 @ bool doOperation(uint32_t sector, uint32_t num_sectors, void* buffer, bool(*operation)(u32 sector, void* buffer))
+@ BEGIN_ASM_FUNC_NO_SECTION doSDOperation thumb
 doSDOperation:
 	push {r3-r7, lr}
 	movs r4, r0
