@@ -291,18 +291,19 @@ sdhc_write_label:
 
 	bl	cardExt_RomSendWriteDataShort
 
-	movs r3, #0x80
-	lsls r3, #2
+	movs r0, r4
+	movs r4, #0x80
+	lsls r4, #2
 write_data_loop:
 	bl	cardExt_RomSendWriteData
-	subs r3, #2
+	subs r4, #2
 	bne	write_data_loop
 
-	movs r3, #8
+	movs r4, #8
 	mov	r0, sp
 write_crc_loop:
 	bl	cardExt_RomSendWriteData
-	subs r3, #2
+	subs r4, #2
 	bne	write_crc_loop
 	movs r4, #1
 
