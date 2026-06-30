@@ -127,7 +127,6 @@ ez5h_sdhc_read_label:
 	movs r0,#0x51
     @ call ez5h_sendSDIOCommand
     bl tramp
-	@ bl ez5h_sendSDIOCommand
 	cmp r0,#0
 	beq sdio_fail
 
