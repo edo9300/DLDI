@@ -462,26 +462,24 @@ doSDOperation:
 	@ these are the og r0,r1,r2,r3 that got pushed in the entrypoint
 	pop {r4,r5,r6,r7}
 	push {lr}
-	adds r6, r4, r6
+	@ get final sector
+	adds r4, r6
 
 check_next_sector:
-	cmp r4, r6
-	beq 1f
-
 	movs r1, r5
-	movs r0, r4
+	@ get current sector being read
+	subs r0, r4, r6
 	bl r7_interwork
 	cmp r0, #0x0
 	beq sderror
 
 	@ load 0x200
 	movs r3, #0x80
-	lsls r3, #0x2
+	lsls r3, #2
 	adds r5, r3
-	adds r4, #0x1
-	b check_next_sector
+	subs r6, #1
+	bne check_next_sector
 
-1:
 sderror:
 	pop {r7}
 r7_interwork:
