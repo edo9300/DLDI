@@ -206,7 +206,6 @@ ez5h_sdhc_write_label:
 	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
 	adr r0, write_tokens_label
 	ldrh r5, [r0,#2]
-	@ lsrs r5, r1, #16
 
 	CALL_NO_INTERWORK SEND_WRITE_DATA_ROM_REG
 
@@ -216,7 +215,7 @@ ez5h_sdhc_write_label:
 	CALL_NO_INTERWORK SDIO_CRC_REG
 
 	@ write the data
-	@ r0 is the data buffer left untouched by the above function call
+	@ r0 is the data buffer provided by the above function call after dereferencing the input r0
 	@ and it gets automatically incremented in ez5h_sendWriteDataRomCommand
 	movs r3, #0xFF
 1:
