@@ -430,7 +430,7 @@ BEGIN_ASM_FUNC_NO_SECTION ez5h_readMultipleSector
 	ldr	r3, ez5h_readSector_addr
 save_regs_and_switch_to_thumb:
 	@ push r0,r1,r3 so that they can be popped in the right regs below
-	push {r0,r1,r3,r4-r12,lr}
+	push {r0,r1,r2,r3,r4-r12,lr}
 	adr r0, sdio_functions
 	ldmia r0!, {SEND_SDIO_COMMAND_REG,SEND_COMMAND_REG,SEND_WRITE_DATA_ROM_REG,SDIO_CRC_REG}
 	orr r0, #1
@@ -459,34 +459,31 @@ ez5h_writeSector_sdio4BitCrc16:
 @ bool doOperation(uint32_t sector, void* buffer, uint32_t num_sectors, bool(*operation)(u32 sector, void* buffer))
 @ BEGIN_ASM_FUNC_NO_SECTION doSDOperation thumb
 doSDOperation:
-	@ these are the og r0,r1,r3 that got pushed in the entrypoint
-	pop {r4,r5,r7}
-	push {r3-r6,lr}
-	adds r6, r4, r2
+	@ these are the og r0,r1,r2,r3 that got pushed in the entrypoint
+	pop {r4,r5,r6,r7}
+	push {lr}
+	adds r6, r4, r6
 
 check_next_sector:
 	cmp r4, r6
-	bne parse_next_sector
+	beq 1f
 
-sderror:
-	@ r0 is either 0 due to sderror, or nonzero due to either being the
-	@ address from the trampoline, or the truthy value from the sd function
-	pop {r3-r7}
-	b r7_interwork
-
-parse_next_sector:
 	movs r1, r5
 	movs r0, r4
 	bl r7_interwork
 	cmp r0, #0x0
 	beq sderror
 
+	@ load 0x200
 	movs r3, #0x80
 	lsls r3, #0x2
 	adds r5, r3
 	adds r4, #0x1
 	b check_next_sector
 
+1:
+sderror:
+	pop {r7}
 r7_interwork:
 	bx	r7
 
