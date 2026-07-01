@@ -470,8 +470,8 @@ BEGIN_ASM_FUNC ez5h_writeMultipleSector
 BEGIN_ASM_FUNC_NO_SECTION ez5h_readMultipleSector
 	ldr	r3, ez5h_readSector_addr
 save_regs_and_switch_to_thumb:
-	@ push r0,r2,r3 so that they can be popped in the right regs below
-	push {r0,r2,r3,r4-r12,lr}
+	@ push r0,r1,r3 so that they can be popped in the right regs below
+	push {r0,r1,r3,r4-r12,lr}
 	adr r4, sdio_functions
 	ldmia r4!, {r9,r10,r11,r12}
 	orr r4, #1
@@ -497,13 +497,13 @@ ez5h_writeSector_sendWriteDataRomCommand:
 ez5h_writeSector_sdio4BitCrc16:
 	.word 0
 
-@ bool doOperation(uint32_t sector, uint32_t num_sectors, void* buffer, bool(*operation)(u32 sector, void* buffer))
+@ bool doOperation(uint32_t sector, void* buffer, uint32_t num_sectors, bool(*operation)(u32 sector, void* buffer))
 @ BEGIN_ASM_FUNC_NO_SECTION doSDOperation thumb
 doSDOperation:
-	@ these are the og r0,r2,r3 that got pushed in the entrypoint
+	@ these are the og r0,r1,r3 that got pushed in the entrypoint
 	pop {r4,r5,r7}
 	push {r3-r6,lr}
-	adds r6, r0, r1
+	adds r6, r4, r2
 
 check_next_sector:
 	cmp r4, r6
