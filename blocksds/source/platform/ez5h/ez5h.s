@@ -191,10 +191,6 @@ ez5h_sdhc_write_label:
 	lsls r1, r0, #9
 
 	movs r0, #0x58
-	@ ldr r7, ez5h_writeSector_sendCommand
-	@ sendCommand+0x28 = ez5h_writeSector_sendSDIOCommand
-	@ adds r7, 0x2A
-	@ bl write_trampoline
 	CALL_NO_INTERWORK SEND_SDIO_COMMAND_REG
 	cmp r0, #0
 	beq sdio_fail_write
@@ -202,9 +198,6 @@ ez5h_sdhc_write_label:
 	@ ez5h_sendSDIOCommand returned us EZ5H_CMD_SDMC_SEND_CLK(1) in r0-r1
 	@ save low word of command
 	movs r6, r0
-	@ subs r7, 0x28
-	@ ldr r7, ez5h_writeSector_sendCommand
-	@ bl write_trampoline
 	CALL_NO_INTERWORK SEND_COMMAND_REG
 	@ bl ez5h_sendCommand
 
