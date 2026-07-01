@@ -10,8 +10,8 @@
 
 #define BYTES_PER_READ 512
 
-bool ez5h_readMultipleSector(uint32_t sector, void* buffer, uint32_t num_sectors);
-bool ez5h_writeMultipleSector(uint32_t sector, const void* buffer, uint32_t num_sectors);
+int ez5h_readMultipleSector(uint32_t sector, void* buffer, uint32_t num_sectors);
+int ez5h_writeMultipleSector(uint32_t sector, const void* buffer, uint32_t num_sectors);
 
 // Initialize the driver. Returns true on success.
 bool EZ5H_Startup(void) {
