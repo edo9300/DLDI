@@ -468,8 +468,9 @@ check_next_sector:
 	cmp r4, r6
 	bne parse_next_sector
 
-	movs r0, #0x1
 sderror:
+	@ r0 is either 0 due to sderror, or nonzero due to either being the
+	@ address from the trampoline, or the truthy value from the sd function
 	pop {r3-r7}
 	b r7_interwork
 
