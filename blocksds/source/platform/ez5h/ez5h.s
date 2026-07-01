@@ -352,6 +352,7 @@ BEGIN_ASM_FUNC ez5h_sdio4BitCrc16
 	bl byteSwap32
 	@ write return high part to the stack slot sp+0 (which gets offsetted by 28 due to 7 extra regs having been pushed)
 	str r2, [sp,#0+28]
+	@ r7 used as scratch
 	pop {r0,r2,r3,r4-r5,r6,r7}
 	mov pc,r7
 
