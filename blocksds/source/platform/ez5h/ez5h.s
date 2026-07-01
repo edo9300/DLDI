@@ -28,12 +28,12 @@
 	ldr	 \dstreg, [\srcreg, \off]
 	@ check that (r2 & (1 << 23)) (data ready), by shifting right 24 bits, if the bit was set, the carry gets updated
 	lsrs \dstreg, #24
-    bcc \label
+	bcc \label
 .endm
 
 .macro CALL_NO_INTERWORK fncreg
-    mov lr,pc
-    mov pc,\fncreg
+	mov lr,pc
+	mov pc,\fncreg
 .endm
 
 @ returns in r2, doesn't touch other regs
@@ -291,13 +291,13 @@ write_tokens_label:
 @ {
 @ 	uint32_t num_words = 512 / sizeof(uint32_t);
 @ 	uint64_t crc = 0;
-@     auto* data = static_cast<uint32_t*>(dataBuf);
-@     auto* end = data + num_words;
-@     while (data < end)
-@     {
-@         uint32_t data_in = __builtin_bswap32(*data++);
-@         crc = calSingleCRC16(crc, data_in);
-@     }
+@ 	auto* data = static_cast<uint32_t*>(dataBuf);
+@ 	auto* end = data + num_words;
+@ 	while (data < end)
+@ 	{
+@ 		uint32_t data_in = __builtin_bswap32(*data++);
+@ 		crc = calSingleCRC16(crc, data_in);
+@ 	}
 @
 @ 	*out = __builtin_bswap64(crc);
 @ }
@@ -308,64 +308,64 @@ write_tokens_label:
 @ out = sp
 @
 @ returns:
-@    in r0 the value at sp+4 passed in input
-@    in sp+0/sp+4 the crc value ready to be sent
+@	in r0 the value at sp+4 passed in input
+@	in sp+0/sp+4 the crc value ready to be sent
 
 BEGIN_ASM_FUNC ez5h_sdio4BitCrc16
 	ldr r0, [sp,#4]
-    push {r0,r2,r3,r4-r5,r6,lr}
-    movs r4, #0 @ r4 = crc_lo
-    movs r5, #0 @ r5 = crc_hi
-    movs r6, #128
+	push {r0,r2,r3,r4-r5,r6,lr}
+	movs r4, #0 @ r4 = crc_lo
+	movs r5, #0 @ r5 = crc_hi
+	movs r6, #128
 1:
-    @ r5 = data_out
-    lsrs r3, r5, #16
-    eors r5, r3
+	@ r5 = data_out
+	lsrs r3, r5, #16
+	eors r5, r3
 
-    ldmia r0!, {r2}
+	ldmia r0!, {r2}
 
-    bl byteSwap32
-    @ r2 = data_in
+	bl byteSwap32
+	@ r2 = data_in
 
-    lsrs r3, r2, #16
-    eors r5, r3
-    eors r2, r5 // r2 = xorred
-    movs r5, r4 // r5 = crc_hi
-    movs r4, r2 // r4 = crc_lo
+	lsrs r3, r2, #16
+	eors r5, r3
+	eors r2, r5 // r2 = xorred
+	movs r5, r4 // r5 = crc_hi
+	movs r4, r2 // r4 = crc_lo
 
-    lsls r3, r2, #20
-    eors r4, r3
-    lsrs r3, r2, #12
-    eors r5, r3
-    lsls r3, r2, #16
-    eors r5, r3
+	lsls r3, r2, #20
+	eors r4, r3
+	lsrs r3, r2, #12
+	eors r5, r3
+	lsls r3, r2, #16
+	eors r5, r3
 
-    subs r6, #1
-    bne 1b
+	subs r6, #1
+	bne 1b
 
-    movs r2, r4
-    bl byteSwap32
+	movs r2, r4
+	bl byteSwap32
 	@ write return high part to the stack slot sp+4 (which gets offsetted by 28 due to 7 extra regs having been pushed)
 	str r2, [sp,#4+28]
 
-    movs r2, r5
-    bl byteSwap32
+	movs r2, r5
+	bl byteSwap32
 	@ write return high part to the stack slot sp+0 (which gets offsetted by 28 due to 7 extra regs having been pushed)
 	str r2, [sp,#0+28]
-    pop {r0,r2,r3,r4-r5,r6,r7}
-    mov pc,r7
+	pop {r0,r2,r3,r4-r5,r6,r7}
+	mov pc,r7
 
 byteSwap32:
-    push {r4-r5,lr}
-    movs r5, #16
-    ldr r4, =0xFF00FF
-    rors r2, r5 // ror 16
-    ands r4, r2
-    bics r2, r4
-    lsls r4, r4, #8
-    lsrs r2, r2, #8
-    orrs r2, r4
-    pop {r4-r5,pc}
+	push {r4-r5,lr}
+	movs r5, #16
+	ldr r4, =0xFF00FF
+	rors r2, r5 // ror 16
+	ands r4, r2
+	bics r2, r4
+	lsls r4, r4, #8
+	lsrs r2, r2, #8
+	orrs r2, r4
+	pop {r4-r5,pc}
 
 .balign 4
 
