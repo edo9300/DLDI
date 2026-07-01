@@ -107,8 +107,9 @@ start_marker_not_received:
 	subs r4, #1
 	bne wait_for_start_marker
 
-	movs r0, #0
 end:
+	@ if r4 is 0, timeout expired thus function failed
+	movs r0, r4
 	pop {r2-r7}
 	mov pc, r7
 
@@ -136,7 +137,7 @@ ez5h_sdhc_read_label:
 
 	movs r0,#0x51
 	CALL_NO_INTERWORK SEND_SDIO_COMMAND_REG
-	cmp r0,#0
+	@ zero flag is set accordingly
 	beq sdio_fail
 
 	@ lower word of EZ5H_CMD_SDMC_READ_DATA
@@ -174,6 +175,7 @@ check_busy:
 	blt is_busy
 
 sdio_fail:
+	@ r0 is the og result of ez5h_sendSDIOCommand, pass it through
 	pop	 {r4-r7,pc}
 .balign 4
 read_sector_data:
@@ -192,7 +194,7 @@ ez5h_sdhc_write_label:
 
 	movs r0, #0x58
 	CALL_NO_INTERWORK SEND_SDIO_COMMAND_REG
-	cmp r0, #0
+	@ zero flag is set accordingly
 	beq sdio_fail_write
 
 	@ ez5h_sendSDIOCommand returned us EZ5H_CMD_SDMC_SEND_CLK(1) in r0-r1
