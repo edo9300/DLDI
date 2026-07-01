@@ -201,7 +201,6 @@ ez5h_sdhc_write_label:
 	@ save low word of command
 	movs r6, r0
 	CALL_NO_INTERWORK SEND_COMMAND_REG
-	@ bl ez5h_sendCommand
 
 	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
 	adr r0, write_tokens_label
