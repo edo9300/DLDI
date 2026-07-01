@@ -70,10 +70,9 @@ BEGIN_ASM_FUNC ez5h_sendCommand
 	mov pc, lr
 
 @ ez5h_sendSDIOCommand(u8 command, u32 parameter)
-@ returns either 0 or EZ5H_CMD_SDMC_SEND_CLK(1) (r0-r1)
+@ returns either 0 or EZ5H_CMD_SDMC_SEND_CLK(1) (r0-r1), thrashes r7
 BEGIN_ASM_FUNC_NO_SECTION ez5h_sendSDIOCommand
-	push {r2-r7}
-	mov r8, lr
+	push {r2-r6,lr}
 	lsls r2, r0, #24
 	@ fixed part of the EZ5H_CMD_SDMC_SDIO command
 	ldr r7, =0x0000FAB8
@@ -107,7 +106,7 @@ start_marker_not_received:
 	movs r0, #0
 end:
 	pop {r2-r7}
-	mov pc, r8
+	mov pc, r7
 
 .balign 4
 ez5h_sendCommand_data:
@@ -125,8 +124,7 @@ BEGIN_ASM_FUNC ez5h_readSector
 	@ r3 holds REG_MCCMD0
 	@ r4 holds EZ5H_CTRL_READ_512
 	@ r5 holds REG_MCD1
-	@ r7 holds the address to ez5h_sendSDIOCommand
-	ldmia r2, {r2,r3,r4,r5,r7}
+	ldmia r2, {r2,r3,r4,r5}
 
 .global ez5h_sdhc_read_label
 ez5h_sdhc_read_label:
@@ -183,9 +181,6 @@ read_sector_data:
 	.word REG_MCCMD0
 	.word EZ5H_CTRL_READ_512
 	.word REG_MCD1
-.global read_ez5h_sendSDIOCommand_label
-read_ez5h_sendSDIOCommand_label:
-	.word 0
 
 @ bool ez5h_writeSector(u32 sector, void* buffer)
 BEGIN_ASM_FUNC ez5h_writeSector
