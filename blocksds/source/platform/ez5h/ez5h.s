@@ -431,14 +431,14 @@ BEGIN_ASM_FUNC_NO_SECTION ez5h_readMultipleSector
 save_regs_and_switch_to_thumb:
 	@ push r0,r1,r3 so that they can be popped in the right regs below
 	push {r0,r1,r3,r4-r12,lr}
-	adr r4, sdio_functions
-	ldmia r4!, {SEND_SDIO_COMMAND_REG,SEND_COMMAND_REG,SEND_WRITE_DATA_ROM_REG,SDIO_CRC_REG}
-	orr r4, #1
+	adr r0, sdio_functions
+	ldmia r0!, {SEND_SDIO_COMMAND_REG,SEND_COMMAND_REG,SEND_WRITE_DATA_ROM_REG,SDIO_CRC_REG}
+	orr r0, #1
 	bl trampoline
 	pop {r4-r12,lr}
 	bx lr
 trampoline:
-	bx r4
+	bx r0
 
 .thumb
 .global ez5h_writeSector_sendSDIOCommand
