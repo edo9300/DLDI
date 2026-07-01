@@ -434,10 +434,6 @@ save_regs_and_switch_to_thumb:
 	adr r0, sdio_functions
 	ldmia r0!, {SEND_SDIO_COMMAND_REG,SEND_COMMAND_REG,SEND_WRITE_DATA_ROM_REG,SDIO_CRC_REG}
 	orr r0, #1
-	bl trampoline
-	pop {r4-r12,lr}
-	bx lr
-trampoline:
 	bx r0
 
 .thumb
@@ -461,7 +457,6 @@ ez5h_writeSector_sdio4BitCrc16:
 doSDOperation:
 	@ these are the og r0,r1,r2,r3 that got pushed in the entrypoint
 	pop {r4,r5,r6,r7}
-	push {lr}
 	@ get final sector
 	adds r4, r6
 
@@ -481,7 +476,7 @@ check_next_sector:
 	bne check_next_sector
 
 sderror:
-	pop {r7}
+	adr r7, return_interwork
 r7_interwork:
 	bx	r7
 
@@ -492,4 +487,9 @@ ez5h_readSector_addr:
 .global ez5h_writeSector_addr
 ez5h_writeSector_addr:
 	.word 0
+
+.arm
+return_interwork:
+	pop {r4-r12,lr}
+	bx lr
 
