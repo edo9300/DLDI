@@ -1,5 +1,10 @@
 #include <nds/asminc.h>
 
+#define SEND_SDIO_COMMAND_REG r9
+#define SEND_COMMAND_REG r10
+#define SEND_WRITE_DATA_ROM_REG r11
+#define SDIO_CRC_REG r12
+
 .equ REG_MCCNT0 , 0x040001A0
 .equ REG_MCD0   , 0x040001A2
 .equ REG_MCCNT1 , 0x040001A4
@@ -96,8 +101,7 @@ wait_for_start_marker:
 	bl ez5h_sendCommand
 	tst r2, r5
 	bne start_marker_not_received
-	@ r0 is already non-0
-	@ movs r0, #1
+	@ r0 is non-0
 	b end
 start_marker_not_received:
 	subs r4, #1
@@ -131,9 +135,7 @@ ez5h_sdhc_read_label:
 	lsls r1,r0,#9
 
 	movs r0,#0x51
-    @ call ez5h_sendSDIOCommand
-    @ bl tramp
-	CALL_NO_INTERWORK r9
+	CALL_NO_INTERWORK SEND_SDIO_COMMAND_REG
 	cmp r0,#0
 	beq sdio_fail
 
@@ -173,8 +175,6 @@ check_busy:
 
 sdio_fail:
 	pop	 {r4-r7,pc}
-@ tramp:
-	@ bx r7
 .balign 4
 read_sector_data:
 	.word EZ5H_CMD_SDMC_READ_DATA_LOWER_WORD
@@ -195,7 +195,7 @@ ez5h_sdhc_write_label:
 	@ sendCommand+0x28 = ez5h_writeSector_sendSDIOCommand
 	@ adds r7, 0x2A
 	@ bl write_trampoline
-	CALL_NO_INTERWORK r9
+	CALL_NO_INTERWORK SEND_SDIO_COMMAND_REG
 	cmp r0, #0
 	beq sdio_fail_write
 
@@ -205,7 +205,7 @@ ez5h_sdhc_write_label:
 	@ subs r7, 0x28
 	@ ldr r7, ez5h_writeSector_sendCommand
 	@ bl write_trampoline
-	CALL_NO_INTERWORK r10
+	CALL_NO_INTERWORK SEND_COMMAND_REG
 	@ bl ez5h_sendCommand
 
 	@ we use lower short as value to write, upper short is EZ5H_CMD_SDMC_SEND_CRC_STATUS used below
@@ -213,31 +213,19 @@ ez5h_sdhc_write_label:
 	ldrh r5, [r0,#2]
 	@ lsrs r5, r1, #16
 
-	@ bl ez5h_sendWriteDataRomCommandShort
-	@ ldr r7, ez5h_writeSector_sendWriteDataRomCommand
-	@ movs r4, #4
-	@ add r4, r11
-	CALL_NO_INTERWORK r11
-	@ bl write_trampoline
+	CALL_NO_INTERWORK SEND_WRITE_DATA_ROM_REG
 
 	@ load buffer addr that was pushed at the start
 	@ sdio4BitCrc16 will get the arguments directly from the stack
 	@ and return the buffer address in r0
-	@ bl ez5h_sdio4BitCrc16
-	@ ldr r4, ez5h_writeSector_sdio4BitCrc16
-	CALL_NO_INTERWORK r12
-	@ ldr r7, ez5h_writeSector_sdio4BitCrc16
-	@ bl write_trampoline
+	CALL_NO_INTERWORK SDIO_CRC_REG
 
 	@ write the data
 	@ r0 is the data buffer left untouched by the above function call
 	@ and it gets automatically incremented in ez5h_sendWriteDataRomCommand
-	@ ldr r7, ez5h_writeSector_sendWriteDataRomCommand
 	movs r3, #0xFF
 1:
-	@ bl ez5h_sendWriteDataRomCommand
-	@ bl write_trampoline
-	CALL_NO_INTERWORK r11
+	CALL_NO_INTERWORK SEND_WRITE_DATA_ROM_REG
 	@ do 0x100 iterations
 	subs r3, #1
 	bge 1b
@@ -247,34 +235,26 @@ ez5h_sdhc_write_label:
 	mov r0, sp
 	movs r3, #3
 1:
-	@ bl ez5h_sendWriteDataRomCommand
-	@ bl write_trampoline
-	CALL_NO_INTERWORK r11
+	CALL_NO_INTERWORK SEND_WRITE_DATA_ROM_REG
 	subs r3, #1
 	bge 1b
 
-	@ ldr r7, ez5h_writeSector_sendCommand
 	@ wait crc status start acknowledgment
 	@ load EZ5H_CMD_SDMC_SEND_CRC_STATUS
 	movs r1, #0
 	movs r0, r5
 1:
-	@ bl ez5h_sendCommand
-	@ bl write_trampoline
-	CALL_NO_INTERWORK r10
+	CALL_NO_INTERWORK SEND_COMMAND_REG
 	lsrs r2, #1
 	bcs 1b
 
 	@ send single crc read clock
-	@ bl ez5h_sendCommand
 	@ ===============================MAYBE BREAK====================
-	@ bl write_trampoline
+	@ CALL_NO_INTERWORK SEND_COMMAND_REG
 
 	@ wait crc status acknowledged
 1:
-	@ bl ez5h_sendCommand
-	@ bl write_trampoline
-	CALL_NO_INTERWORK r10
+	CALL_NO_INTERWORK SEND_COMMAND_REG
 	lsrs r2, #1
 	bcc 1b
 
@@ -283,32 +263,17 @@ ez5h_sdhc_write_label:
 	movs r0, r6
 	movs r4, #0xFF
 1:
-	@ bl ez5h_sendCommand
-	@ bl write_trampoline
-	CALL_NO_INTERWORK r10
+	CALL_NO_INTERWORK SEND_COMMAND_REG
 	tst r2, r4
 	bne 1b
 
 sdio_fail_write:
 	@ r0 either is 0 or is EZ5H_CMD_SDMC_SEND_CLK(1) (thus nonzero)
 	pop	{r1-r2,r4-r7,pc}
-@ write_trampoline:
-	@ bx r7
 .balign 4
 .pool
 write_tokens_label:
 	.word 0xF8B8F0FF
-
-@ .global ez5h_writeSector_sendCommand
-@ .global ez5h_writeSector_sendWriteDataRomCommand
-@ .global ez5h_writeSector_sdio4BitCrc16
-
-@ ez5h_writeSector_sendCommand:
-	@ .word 0
-@ ez5h_writeSector_sendWriteDataRomCommand:
-	@ .word 0
-@ ez5h_writeSector_sdio4BitCrc16:
-	@ .word 0
 
 
 @ static uint64_t inline calSingleCRC16(uint64_t crc, uint32_t data_in){
@@ -468,7 +433,7 @@ save_regs_and_switch_to_thumb:
 	@ push r0,r1,r3 so that they can be popped in the right regs below
 	push {r0,r1,r3,r4-r12,lr}
 	adr r4, sdio_functions
-	ldmia r4!, {r9,r10,r11,r12}
+	ldmia r4!, {SEND_SDIO_COMMAND_REG,SEND_COMMAND_REG,SEND_WRITE_DATA_ROM_REG,SDIO_CRC_REG}
 	orr r4, #1
 	bl trampoline
 	pop {r4-r12,lr}
