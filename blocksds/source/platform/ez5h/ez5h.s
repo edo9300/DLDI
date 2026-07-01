@@ -306,9 +306,13 @@ write_tokens_label:
 @ args are passed on the stack:
 @ inbuff = sp+4
 @ out = sp
+@
+@ returns:
+@    in r0 the value at sp+4 passed in input
+@    in sp+0/sp+4 the crc value ready to be sent
+
 BEGIN_ASM_FUNC ez5h_sdio4BitCrc16
 	ldr r0, [sp,#4]
-	mov r1, sp
     push {r0,r2,r3,r4-r5,r6,lr}
     movs r4, #0 @ r4 = crc_lo
     movs r5, #0 @ r5 = crc_hi
@@ -341,14 +345,15 @@ BEGIN_ASM_FUNC ez5h_sdio4BitCrc16
 
     movs r2, r4
     bl byteSwap32
-	str r2, [r1,#4]
+	@ write return high part to the stack slot sp+4 (which gets offsetted by 28 due to 7 extra regs having been pushed)
+	str r2, [sp,#4+28]
 
     movs r2, r5
     bl byteSwap32
-	str r2, [r1]
-    pop {r0,r2,r3,r4-r5,r6}
-	pop {r1}
-    mov pc,r1
+	@ write return high part to the stack slot sp+0 (which gets offsetted by 28 due to 7 extra regs having been pushed)
+	str r2, [sp,#0+28]
+    pop {r0,r2,r3,r4-r5,r6,r7}
+    mov pc,r7
 
 byteSwap32:
     push {r4-r5,lr}
