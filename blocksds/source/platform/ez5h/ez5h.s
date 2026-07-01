@@ -429,8 +429,8 @@ BEGIN_ASM_FUNC ez5h_writeMultipleSector
 BEGIN_ASM_FUNC_NO_SECTION ez5h_readMultipleSector
 	ldr	r3, ez5h_readSector_addr
 save_regs_and_switch_to_thumb:
-	@ push r0,r1,r3 so that they can be popped in the right regs below
-	push {r0,r1,r2,r3,r4-r12,lr}
+	@ push r0,r1,r2,r3 so that they can be popped in the right regs below
+	push {r0-r3,r4-r12,lr}
 	adr r0, sdio_functions
 	ldmia r0!, {SEND_SDIO_COMMAND_REG,SEND_COMMAND_REG,SEND_WRITE_DATA_ROM_REG,SDIO_CRC_REG}
 	orr r0, #1
@@ -464,7 +464,7 @@ check_next_sector:
 	movs r1, r5
 	@ get current sector being read
 	subs r0, r4, r6
-	bl r7_interwork
+	bl call_sdio_function_in_r7
 	cmp r0, #0x0
 	beq sderror
 
@@ -477,7 +477,8 @@ check_next_sector:
 
 sderror:
 	adr r7, return_interwork
-r7_interwork:
+
+call_sdio_function_in_r7:
 	bx	r7
 
 .balign 4
