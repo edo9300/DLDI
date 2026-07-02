@@ -125,10 +125,10 @@ BEGIN_ASM_FUNC ez5h_readMultipleSector
 	push {r4-r7}
 	adr r3, ez5h_readSector
 	adds r3,#1
-	nop
 	ldr r4, ez5h_readSector_doSDOperation
 	bx r4
 
+.balign 4
 @ bool ez5h_readSector(u32 sector, void* buffer)
 ez5h_readSector:
 	push {r3,r4-r7,lr}
