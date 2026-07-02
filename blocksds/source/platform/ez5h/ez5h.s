@@ -2,8 +2,8 @@
 
 #define SEND_SDIO_COMMAND_REG r7
 #define SEND_COMMAND_REG r10
-#define SEND_WRITE_DATA_ROM_REG r11
-#define SDIO_CRC_REG r12
+#define SDIO_CRC_REG r11
+#define SEND_WRITE_DATA_ROM_REG r12
 
 .equ REG_MCCNT0 , 0x040001A0
 .equ REG_MCD0   , 0x040001A2
@@ -435,7 +435,7 @@ send_writedata_data:
 BEGIN_ASM_FUNC ez5h_writeMultipleSector
 	push {r4-r7,r8-r12,lr}
 	adr r4, sdio_functions
-	ldmia r4, {r3,r7,SEND_COMMAND_REG,SEND_WRITE_DATA_ROM_REG,SDIO_CRC_REG}
+	ldmia r4, {r3,r7,SEND_COMMAND_REG,SDIO_CRC_REG,SEND_WRITE_DATA_ROM_REG}
 	@ doSDOperation will pop r4-r7 off the stack
 	@ leaving to us to pop the remaining hiregs
 	bl trampoline
@@ -456,9 +456,9 @@ ez5h_writeSector_doSDOperation:
 	.word 0
 ez5h_writeSector_sendCommand:
 	.word 0
-ez5h_writeSector_sendWriteDataRomCommand:
-	.word 0
 ez5h_writeSector_sdio4BitCrc16:
+	.word 0
+ez5h_writeSector_sendWriteDataRomCommand:
 	.word 0
 
 .thumb
