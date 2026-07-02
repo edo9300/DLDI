@@ -124,6 +124,8 @@ BEGIN_ASM_FUNC ez5h_readMultipleSector
 	@ doSDOperation will take care of handling the return
 	push {r4-r7}
 	adr r3, ez5h_readSector
+	adds r3,#1
+	nop
 	ldr r4, ez5h_readSector_doSDOperation
 	bx r4
 
