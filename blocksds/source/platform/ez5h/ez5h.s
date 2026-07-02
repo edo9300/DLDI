@@ -383,6 +383,35 @@ byteSwap32:
 
 .pool
 
+.arm
+@ez5h_writeMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
+BEGIN_ASM_FUNC ez5h_writeMultipleSector
+	push {r4-r7,r8-r12,lr}
+	adr SEND_WRITE_DATA_ROM_REG, sdio_functions
+	ldmia SEND_WRITE_DATA_ROM_REG!, {r3,r7,SEND_COMMAND_REG,SDIO_CRC_REG}
+	@ doSDOperation will pop r4-r7 off the stack
+	@ leaving to us to pop the remaining hiregs
+	bl trampoline
+	pop {r8-r12,lr}
+	bx lr
+trampoline:
+	bx r7
+
+.global ez5h_writeSector_addr
+.global ez5h_writeSector_doSDOperation
+.global ez5h_writeSector_sendCommand
+.global ez5h_writeSector_sdio4BitCrc16
+sdio_functions:
+ez5h_writeSector_addr:
+	.word 0
+ez5h_writeSector_doSDOperation:
+	.word 0
+ez5h_writeSector_sendCommand:
+	.word 0
+ez5h_writeSector_sdio4BitCrc16:
+	.word 0
+
+.thumb
 @ez5h_sendWriteDataRomCommand(const u8* datab)
 BEGIN_ASM_FUNC ez5h_sendWriteDataRomCommand
 	ldrh r1, [r0]
@@ -430,38 +459,6 @@ send_writedata_data:
 	.word 0xF6B8
 	.word REG_MCCNT0
 
-.arm
-@ez5h_writeMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
-BEGIN_ASM_FUNC ez5h_writeMultipleSector
-	push {r4-r7,r8-r12,lr}
-	adr r4, sdio_functions
-	ldmia r4, {r3,r7,SEND_COMMAND_REG,SDIO_CRC_REG,SEND_WRITE_DATA_ROM_REG}
-	@ doSDOperation will pop r4-r7 off the stack
-	@ leaving to us to pop the remaining hiregs
-	bl trampoline
-	pop {r8-r12,lr}
-	bx lr
-trampoline:
-	bx r7
-
-.global ez5h_writeSector_addr
-.global ez5h_writeSector_doSDOperation
-.global ez5h_writeSector_sendCommand
-.global ez5h_writeSector_sendWriteDataRomCommand
-.global ez5h_writeSector_sdio4BitCrc16
-sdio_functions:
-ez5h_writeSector_addr:
-	.word 0
-ez5h_writeSector_doSDOperation:
-	.word 0
-ez5h_writeSector_sendCommand:
-	.word 0
-ez5h_writeSector_sdio4BitCrc16:
-	.word 0
-ez5h_writeSector_sendWriteDataRomCommand:
-	.word 0
-
-.thumb
 @ bool ez5h_doSDOperation(uint32_t sector, void* buffer, uint32_t num_sectors, bool(*operation)(u32 sector, void* buffer))
 BEGIN_ASM_FUNC ez5h_doSDOperation
 	@ push r0,r1,r2 so that they can be popped in the right regs below
