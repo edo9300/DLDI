@@ -415,7 +415,7 @@ ez5h_writeSector_sdio4BitCrc16:
 
 .thumb
 @ez5h_sendWriteDataRomCommand(const u8* datab)
-BEGIN_ASM_FUNC_NO_SECTION ez5h_sendWriteDataRomCommand
+ez5h_sendWriteDataRomCommand:
 	ldrh r1, [r0]
 	adds r0, #2
 	push {r0,r3}
