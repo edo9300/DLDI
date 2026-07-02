@@ -119,8 +119,16 @@ ez5h_sendCommand_data:
 	.word   EZ5H_CTRL_READ_4B
 	.word   REG_MCD1
 
+@ez5h_readMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
+BEGIN_ASM_FUNC ez5h_readMultipleSector
+	@ doSDOperation will take care of handling the return
+	push {r4-r7}
+	adr r3, ez5h_readSector
+	ldr r4, ez5h_readSector_doSDOperation
+	bx r4
+
 @ bool ez5h_readSector(u32 sector, void* buffer)
-BEGIN_ASM_FUNC ez5h_readSector
+BEGIN_ASM_FUNC_NO_SECTION ez5h_readSector
 	push {r3,r4-r7,lr}
 	movs r6,r1
 
@@ -183,6 +191,9 @@ read_sector_data:
 	.word REG_MCCMD0
 	.word EZ5H_CTRL_READ_512
 	.word REG_MCD1
+.global ez5h_readSector_doSDOperation
+ez5h_readSector_doSDOperation:
+	.word 0
 
 @ bool ez5h_writeSector(u32 sector, void* buffer)
 BEGIN_ASM_FUNC ez5h_writeSector
@@ -451,12 +462,8 @@ ez5h_writeSector_sdio4BitCrc16:
 	.word 0
 
 .thumb
-
-BEGIN_ASM_FUNC ez5h_readMultipleSector
-	push {r4-r7}
-	ldr r3, ez5h_readSector_addr
-@ bool doOperation(uint32_t sector, void* buffer, uint32_t num_sectors, bool(*operation)(u32 sector, void* buffer))
-BEGIN_ASM_FUNC_NO_SECTION ez5h_doSDOperation
+@ bool ez5h_doSDOperation(uint32_t sector, void* buffer, uint32_t num_sectors, bool(*operation)(u32 sector, void* buffer))
+BEGIN_ASM_FUNC ez5h_doSDOperation
 	@ push r0,r1,r2 so that they can be popped in the right regs below
 	@ once popped, it will leave on the stack lr,r4-r7
 	push {r0,r1,r2,lr}
@@ -489,10 +496,6 @@ call_sdio_function_in_r3:
 	bx r3
 
 .balign 4
-.global ez5h_readSector_addr
-ez5h_readSector_addr:
-	.word 0
-
 .global ez5h_doSDOperation_sendSDIOCommand
 ez5h_doSDOperation_sendSDIOCommand:
 	.word 0

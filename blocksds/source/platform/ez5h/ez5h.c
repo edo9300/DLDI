@@ -101,6 +101,7 @@ extern u32 ez5h_writeSector_sendWriteDataRomCommand;
 extern u32 ez5h_writeSector_sdio4BitCrc16;
 
 extern u32 ez5h_writeSector_doSDOperation;
+extern u32 ez5h_readSector_doSDOperation;
 
 void ez5h_sendSDIOCommand();
 void ez5h_sendCommand();
@@ -121,6 +122,7 @@ bool EZ5H_SDInitialize(void) {
 	ez5h_writeSector_sdio4BitCrc16 = (unsigned)&ez5h_sdio4BitCrc16;
 
 	ez5h_writeSector_doSDOperation = (unsigned)&ez5h_doSDOperation;
+	ez5h_readSector_doSDOperation = (unsigned)&ez5h_doSDOperation;
 
 
     u8 response[17] = {};
