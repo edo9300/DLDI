@@ -121,7 +121,7 @@ ez5h_sendCommand_data:
 
 @ bool ez5h_readSector(u32 sector, void* buffer)
 BEGIN_ASM_FUNC ez5h_readSector
-	push {r4-r7,lr}
+	push {r3,r4-r7,lr}
 	movs r6,r1
 
 	adr r2,read_sector_data
@@ -176,7 +176,7 @@ check_busy:
 
 sdio_fail:
 	@ r0 is the og result of ez5h_sendSDIOCommand, pass it through
-	pop	 {r4-r7,pc}
+	pop	 {r3,r4-r7,pc}
 .balign 4
 read_sector_data:
 	.word EZ5H_CMD_SDMC_READ_DATA_LOWER_WORD
@@ -186,7 +186,7 @@ read_sector_data:
 
 @ bool ez5h_writeSector(u32 sector, void* buffer)
 BEGIN_ASM_FUNC ez5h_writeSector
-	push {r0-r1,r4-r7,lr}
+	push {r0-r1,r3,r4-r7,lr}
 
 .global ez5h_sdhc_write_label
 ez5h_sdhc_write_label:
@@ -262,7 +262,7 @@ ez5h_sdhc_write_label:
 
 sdio_fail_write:
 	@ r0 either is 0 or is EZ5H_CMD_SDMC_SEND_CLK(1) (thus nonzero)
-	pop {r1-r2,r4-r7,pc}
+	pop {r1-r2,r3,r4-r7,pc}
 .balign 4
 .pool
 write_tokens_label:
@@ -422,28 +422,26 @@ send_writedata_data:
 .arm
 @ez5h_writeMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
 BEGIN_ASM_FUNC ez5h_writeMultipleSector
-	ldr r3, ez5h_writeSector_addr
-	b save_regs_and_switch_to_thumb
+	push {r4-r7,r8-r12,lr}
+	adr r4, sdio_functions
+	ldmia r4, {r3,r7,SEND_COMMAND_REG,SEND_WRITE_DATA_ROM_REG,SDIO_CRC_REG}
+	@ doSDOperation will pop r4-r7 off the stack
+	@ leaving to us to pop the remaining hiregs
+	bl trampoline
+	pop {r8-r12,lr}
+	bx lr
+trampoline:
+	bx r7
 
-@ez5h_readMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
-BEGIN_ASM_FUNC_NO_SECTION ez5h_readMultipleSector
-	ldr r3, ez5h_readSector_addr
-save_regs_and_switch_to_thumb:
-	@ push r0,r1,r2,r3 so that they can be popped in the right regs below
-	push {r0-r3,r4-r12,lr}
-	adr r0, sdio_functions
-	ldmia r0!, {SEND_SDIO_COMMAND_REG,SEND_COMMAND_REG,SEND_WRITE_DATA_ROM_REG,SDIO_CRC_REG}
-	orr r0, #1
-	bx r0
-
-.thumb
-.global ez5h_writeSector_sendSDIOCommand
+.global ez5h_writeSector_addr
+.global ez5h_writeSector_doSDOperation
 .global ez5h_writeSector_sendCommand
 .global ez5h_writeSector_sendWriteDataRomCommand
 .global ez5h_writeSector_sdio4BitCrc16
-
 sdio_functions:
-ez5h_writeSector_sendSDIOCommand:
+ez5h_writeSector_addr:
+	.word 0
+ez5h_writeSector_doSDOperation:
 	.word 0
 ez5h_writeSector_sendCommand:
 	.word 0
@@ -452,11 +450,19 @@ ez5h_writeSector_sendWriteDataRomCommand:
 ez5h_writeSector_sdio4BitCrc16:
 	.word 0
 
+.thumb
+
+BEGIN_ASM_FUNC ez5h_readMultipleSector
+	push {r4-r7}
+	ldr r3, ez5h_readSector_addr
 @ bool doOperation(uint32_t sector, void* buffer, uint32_t num_sectors, bool(*operation)(u32 sector, void* buffer))
-@ BEGIN_ASM_FUNC_NO_SECTION doSDOperation thumb
-doSDOperation:
-	@ these are the og r0,r1,r2,r3 that got pushed in the entrypoint
-	pop {r4,r5,r6,r7}
+BEGIN_ASM_FUNC_NO_SECTION ez5h_doSDOperation
+	@ push r0,r1,r2 so that they can be popped in the right regs below
+	@ once popped, it will leave on the stack lr,r4-r7
+	push {r0,r1,r2,lr}
+	ldr SEND_SDIO_COMMAND_REG, ez5h_writeSector_sendSDIOCommand
+	@ these are the og r0,r1,r2 that got pushed in the entrypoint
+	pop {r4,r5,r6}
 	@ get final sector
 	adds r4, r6
 
@@ -464,33 +470,29 @@ check_next_sector:
 	movs r1, r5
 	@ get current sector being read
 	subs r0, r4, r6
-	bl call_sdio_function_in_r7
+	bl call_sdio_function_in_r3
 	cmp r0, #0x0
 	beq sderror
 
 	@ load 0x200
-	movs r3, #0x80
-	lsls r3, #2
-	adds r5, r3
+	movs r2, #0x80
+	lsls r2, #2
+	adds r5, r2
 	subs r6, #1
 	bne check_next_sector
 
 sderror:
-	adr r7, return_interwork
+	@ r3 is the actual return address
+	pop {r3,r4-r7}
 
-call_sdio_function_in_r7:
-	bx r7
+call_sdio_function_in_r3:
+	bx r3
 
 .balign 4
 .global ez5h_readSector_addr
 ez5h_readSector_addr:
 	.word 0
-.global ez5h_writeSector_addr
-ez5h_writeSector_addr:
+
+.global ez5h_doSDOperation_sendSDIOCommand
+ez5h_doSDOperation_sendSDIOCommand:
 	.word 0
-
-.arm
-return_interwork:
-	pop {r4-r12,lr}
-	bx lr
-
