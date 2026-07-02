@@ -25,7 +25,7 @@
 
 .macro CHECK_DATA_READY dstreg,srcreg,off,label
 	@ read mccnt1 status flag
-	ldr	 \dstreg, [\srcreg, \off]
+	ldr \dstreg, [\srcreg, \off]
 	@ check that (r2 & (1 << 23)) (data ready), by shifting right 24 bits, if the bit was set, the carry gets updated
 	lsrs \dstreg, #24
 	bcc \label
@@ -64,7 +64,7 @@ BEGIN_ASM_FUNC ez5h_sendCommand
 
 	@ REG_MCCNT0 + 4 = REG_MCCNT1
 	@ write EZ5H_CTRL_READ_4B to mccnt1
-	str r4, [r3, #4]	
+	str r4, [r3, #4]
 
 1:
 	CHECK_DATA_READY r1,r3,#4,1b
@@ -153,7 +153,7 @@ ez5h_sdhc_read_label:
 
 	@ REG_MCCNT00 + 4 = REG_MCCNT1
 	@ write EZ5H_CTRL_READ_512 to mccnt1
-	str r4, [r3, #4]	
+	str r4, [r3, #4]
 
 	@ read data
 	movs r2, #0x80
@@ -262,7 +262,7 @@ ez5h_sdhc_write_label:
 
 sdio_fail_write:
 	@ r0 either is 0 or is EZ5H_CMD_SDMC_SEND_CLK(1) (thus nonzero)
-	pop	{r1-r2,r4-r7,pc}
+	pop {r1-r2,r4-r7,pc}
 .balign 4
 .pool
 write_tokens_label:
@@ -422,12 +422,12 @@ send_writedata_data:
 .arm
 @ez5h_writeMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
 BEGIN_ASM_FUNC ez5h_writeMultipleSector
-	ldr	r3, ez5h_writeSector_addr
+	ldr r3, ez5h_writeSector_addr
 	b save_regs_and_switch_to_thumb
 
 @ez5h_readMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
 BEGIN_ASM_FUNC_NO_SECTION ez5h_readMultipleSector
-	ldr	r3, ez5h_readSector_addr
+	ldr r3, ez5h_readSector_addr
 save_regs_and_switch_to_thumb:
 	@ push r0,r1,r2,r3 so that they can be popped in the right regs below
 	push {r0-r3,r4-r12,lr}
@@ -479,7 +479,7 @@ sderror:
 	adr r7, return_interwork
 
 call_sdio_function_in_r7:
-	bx	r7
+	bx r7
 
 .balign 4
 .global ez5h_readSector_addr
