@@ -464,7 +464,7 @@ BEGIN_ASM_FUNC ez5h_doSDOperation
 	@ push r0,r1,r2 so that they can be popped in the right regs below
 	@ once popped, it will leave on the stack lr,r4-r7
 	push {r0,r1,r2,lr}
-	ldr SEND_SDIO_COMMAND_REG, ez5h_writeSector_sendSDIOCommand
+	ldr SEND_SDIO_COMMAND_REG, ez5h_doSDOperation_sendSDIOCommand
 	@ these are the og r0,r1,r2 that got pushed in the entrypoint
 	pop {r4,r5,r6}
 	@ get final sector
