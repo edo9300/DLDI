@@ -115,9 +115,9 @@ end:
 
 .balign 4
 ez5h_sendCommand_data:
-	.word   REG_MCCMD0
-	.word   EZ5H_CTRL_READ_4B
-	.word   REG_MCD1
+	.word REG_MCCMD0
+	.word EZ5H_CTRL_READ_4B
+	.word REG_MCD1
 
 @ez5h_readMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
 BEGIN_ASM_FUNC ez5h_readMultipleSector
@@ -184,7 +184,7 @@ check_busy:
 
 sdio_fail:
 	@ r0 is the og result of ez5h_sendSDIOCommand, pass it through
-	pop	 {r3,r4-r7,pc}
+	pop {r3,r4-r7,pc}
 .balign 4
 read_sector_data:
 	.word EZ5H_CMD_SDMC_READ_DATA_LOWER_WORD
