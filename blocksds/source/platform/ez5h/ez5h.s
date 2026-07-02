@@ -128,7 +128,7 @@ BEGIN_ASM_FUNC ez5h_readMultipleSector
 	bx r4
 
 @ bool ez5h_readSector(u32 sector, void* buffer)
-BEGIN_ASM_FUNC_NO_SECTION ez5h_readSector
+ez5h_readSector:
 	push {r3,r4-r7,lr}
 	movs r6,r1
 

@@ -109,7 +109,6 @@ void ez5h_sdio4BitCrc16();
 void ez5h_doSDOperation();
 
 bool EZ5H_SDInitialize(void) {
-	ez5h_readSector_addr = (unsigned)&ez5h_readSector;
 	ez5h_writeSector_addr = (unsigned)&ez5h_writeSector;
 
 	ez5h_doSDOperation_sendSDIOCommand = (unsigned)&ez5h_sendSDIOCommand;
