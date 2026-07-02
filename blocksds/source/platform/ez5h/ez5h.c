@@ -89,17 +89,17 @@ static bool EZ5H_SDSendSDIOCommand(u8 cmd, u32 parameter, u8* buffer, int size) 
 }
 
 extern uint32_t ez5h_readSector_addr;
-extern uint32_t ez5h_writeSector_addr;
+extern uint32_t ez5h_writeMultipleSector_writeSector_addr;
 extern uint16_t ez5h_sdhc_read_label;
 extern uint16_t ez5h_sdhc_write_label;
 
 extern u32 ez5h_doSDOperation_sendSDIOCommand;
-extern u32 ez5h_writeSector_sendCommand;
+extern u32 ez5h_writeMultipleSector_sendCommand;
 
-extern u32 ez5h_writeSector_sdio4BitCrc16;
+extern u32 ez5h_writeMultipleSector_sdio4BitCrc16;
 
-extern u32 ez5h_writeSector_doSDOperation;
-extern u32 ez5h_readSector_doSDOperation;
+extern u32 ez5h_writeMultipleSector_doSDOperation;
+extern u32 ez5h_readMultipleSector_doSDOperation;
 
 void ez5h_sendSDIOCommand();
 void ez5h_sendCommand();
@@ -109,15 +109,15 @@ void ez5h_sdio4BitCrc16();
 void ez5h_doSDOperation();
 
 bool EZ5H_SDInitialize(void) {
-	ez5h_writeSector_addr = (unsigned)&ez5h_writeSector;
+	ez5h_writeMultipleSector_writeSector_addr = (unsigned)&ez5h_writeSector;
 
 	ez5h_doSDOperation_sendSDIOCommand = (unsigned)&ez5h_sendSDIOCommand;
-	ez5h_writeSector_sendCommand = (unsigned)&ez5h_sendCommand;
+	ez5h_writeMultipleSector_sendCommand = (unsigned)&ez5h_sendCommand;
 
-	ez5h_writeSector_sdio4BitCrc16 = (unsigned)&ez5h_sdio4BitCrc16;
+	ez5h_writeMultipleSector_sdio4BitCrc16 = (unsigned)&ez5h_sdio4BitCrc16;
 
-	ez5h_writeSector_doSDOperation = (unsigned)&ez5h_doSDOperation;
-	ez5h_readSector_doSDOperation = (unsigned)&ez5h_doSDOperation;
+	ez5h_writeMultipleSector_doSDOperation = (unsigned)&ez5h_doSDOperation;
+	ez5h_readMultipleSector_doSDOperation = (unsigned)&ez5h_doSDOperation;
 
 
     u8 response[17] = {};

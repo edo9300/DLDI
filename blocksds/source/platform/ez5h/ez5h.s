@@ -125,7 +125,7 @@ BEGIN_ASM_FUNC ez5h_readMultipleSector
 	push {r4-r7}
 	adr r3, ez5h_readSector
 	adds r3,#1
-	ldr r4, ez5h_readSector_doSDOperation
+	ldr r4, ez5h_readMultipleSector_doSDOperation
 	bx r4
 
 .balign 4
@@ -193,8 +193,8 @@ read_sector_data:
 	.word REG_MCCMD0
 	.word EZ5H_CTRL_READ_512
 	.word REG_MCD1
-.global ez5h_readSector_doSDOperation
-ez5h_readSector_doSDOperation:
+.global ez5h_readMultipleSector_doSDOperation
+ez5h_readMultipleSector_doSDOperation:
 	.word 0
 
 @ bool ez5h_writeSector(u32 sector, void* buffer)
@@ -385,6 +385,10 @@ byteSwap32:
 
 .pool
 
+.global ez5h_writeMultipleSector_writeSector_addr
+.global ez5h_writeMultipleSector_doSDOperation
+.global ez5h_writeMultipleSector_sendCommand
+.global ez5h_writeMultipleSector_sdio4BitCrc16
 .arm
 @ez5h_writeMultipleSector(u32 sector, u8 * buffer, u32 num_sectors)
 BEGIN_ASM_FUNC ez5h_writeMultipleSector
@@ -404,13 +408,13 @@ trampoline:
 .global ez5h_writeSector_sendCommand
 .global ez5h_writeSector_sdio4BitCrc16
 sdio_functions:
-ez5h_writeSector_addr:
+ez5h_writeMultipleSector_writeSector_addr:
 	.word 0
-ez5h_writeSector_doSDOperation:
+ez5h_writeMultipleSector_doSDOperation:
 	.word 0
-ez5h_writeSector_sendCommand:
+ez5h_writeMultipleSector_sendCommand:
 	.word 0
-ez5h_writeSector_sdio4BitCrc16:
+ez5h_writeMultipleSector_sdio4BitCrc16:
 	.word 0
 
 .thumb
